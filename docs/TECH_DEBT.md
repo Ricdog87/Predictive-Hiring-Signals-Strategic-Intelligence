@@ -1,36 +1,12 @@
-# TECH_DEBT – Build V2
+# Tech Debt — Company Intelligence
 
-## P0 (kritisch, als Nächstes)
-1. **Runtime Validation an Integrationsgrenzen**
-   - Betroffen: `adapters/*/adapter.ts`
-   - Risiko: Unsichere `unknown` Payloads erzeugen invalide Signals.
-   - Maßnahme: Schema-Validation + Fehlerkanal.
+## P0
+- Add unit tests for `computeHiringScore` and `predictHiring` edge cases.
+- Add schema validation for adapter payload normalization.
 
-2. **Scoring-Testabdeckung**
-   - Betroffen: `lib/scoring.ts`
-   - Risiko: Regressions bei Gewichtungen/Clamping.
-   - Maßnahme: Unit Tests für Weight-Normalisierung, Edge Cases, deterministische Outputs.
+## P1
+- Move fixed weighting table to versioned configuration.
+- Add historical pattern store backing predictions.
 
-3. **API-Vertrag vereinheitlichen**
-   - Betroffen: `app/api/*/route.ts`
-   - Risiko: Uneinheitliche Consumer-Integration.
-   - Maßnahme: `ApiResponse<T>` überall nutzen (inkl. TraceId).
-
-## P1 (hoch)
-4. **Persistenz vorbereiten**
-   - Risiko: Kein auditierbarer Verlauf.
-   - Maßnahme: Tabellen für Candidates, Signals, Scores, ScoreBreakdown.
-
-5. **Security Hardening**
-   - Risiko: Fehlende Zugriffskontrolle.
-   - Maßnahme: AuthN/AuthZ, Rate Limit, Input-Sanitization.
-
-6. **Provider-spezifische Mappings präzisieren**
-   - Risiko: Informationsverlust bei Normalisierung.
-   - Maßnahme: Mapping-Konfiguration je Signaltyp/Provider.
-
-## P2 (mittel)
-7. **Observability**
-   - Maßnahme: Structured Logging + Correlation IDs.
-8. **Performance**
-   - Maßnahme: Caching & batch-fähige Score-Berechnung.
+## P2
+- Add API contract tests for all company endpoints.

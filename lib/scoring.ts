@@ -1,97 +1,85 @@
-import { CandidateSignal, ScoreBreakdown, ScoreResult, ScoringConfig, ScoringWeights } from './types';
+import { CompanySignal, HiringPrediction, HiringScoreResult, ScoreBreakdown } from './types';
 
-const DEFAULT_CONFIG: ScoringConfig = {
-  modelVersion: 'v2.0.0',
-  clampMin: 0,
-  clampMax: 100,
-  weights: {
-    experience: 0.3,
-    skills: 0.3,
-    education: 0.15,
-    engagement: 0.15,
-    culture: 0.1,
-  },
+const MODEL_VERSION = 'company-intelligence-v2.1.0';
+
+const WEIGHTS: Record<CompanySignal['signalType'], number> = {
+  mna_buy: 1.25,
+  mna_sell: -1.1,
+  gf_change: 0.7,
+  patent_filing: 0.8,
+  location_expansion: 1.2,
+  funding_grant: 1.1,
+  press_release: 0.4,
+  restructuring: -0.8,
+  insolvency: -1.5,
+  job_spike: 1.35,
+  employee_growth: 1.15,
+  product_launch: 0.9,
+  new_business_unit: 1.0,
 };
 
-function clamp(value: number, min = 0, max = 100): number {
-  return Math.max(min, Math.min(max, value));
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+function recencyFactor(observedAt: string): number {
+  const days = Math.max(0, (Date.now() - new Date(observedAt).getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 30) return 1;
+  if (days <= 90) return 0.85;
+  if (days <= 180) return 0.65;
+  return 0.45;
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+export function computeHiringScore(companyId: string, signals: CompanySignal[]): HiringScoreResult {
+  if (!companyId) throw new Error('companyId is required');
 
-function normalizeWeights(weights: ScoringWeights): ScoringWeights {
-  const total = Object.values(weights).reduce((sum, current) => sum + current, 0);
-  if (total <= 0) {
-    throw new Error('Invalid scoring weights: total must be > 0');
+  const byType = new Map<CompanySignal['signalType'], CompanySignal[]>();
+  for (const signal of signals) {
+    const list = byType.get(signal.signalType) ?? [];
+    list.push(signal);
+    byType.set(signal.signalType, list);
   }
 
-  return {
-    experience: weights.experience / total,
-    skills: weights.skills / total,
-    education: weights.education / total,
-    engagement: weights.engagement / total,
-    culture: weights.culture / total,
-  };
-}
-
-function computeSignalStats(signals: CandidateSignal[], signalType: CandidateSignal['signalType']) {
-  const subset = signals.filter((signal) => signal.signalType === signalType);
-  if (!subset.length) {
-    return { rawAverage: 0, confidenceAverage: 0 };
-  }
-
-  const rawAverage = subset.reduce((sum, signal) => sum + signal.value, 0) / subset.length;
-  const confidenceAverage = subset.reduce((sum, signal) => sum + signal.confidence, 0) / subset.length;
-
-  return { rawAverage, confidenceAverage };
-}
-
-export function computeCandidateScore(
-  candidateId: string,
-  signals: CandidateSignal[],
-  overrideConfig?: Partial<ScoringConfig>,
-): ScoreResult {
-  if (!candidateId) {
-    throw new Error('candidateId is required');
-  }
-
-  const config: ScoringConfig = {
-    ...DEFAULT_CONFIG,
-    ...overrideConfig,
-    weights: normalizeWeights({ ...DEFAULT_CONFIG.weights, ...overrideConfig?.weights }),
-  };
-
-  const categories: CandidateSignal['signalType'][] = ['experience', 'skills', 'education', 'engagement', 'culture'];
-
-  const breakdown: ScoreBreakdown[] = categories.map((signalType) => {
-    const { rawAverage, confidenceAverage } = computeSignalStats(signals, signalType);
-    const weighted = rawAverage * config.weights[signalType];
-    const confidenceAdjusted = weighted * clamp(confidenceAverage, 0, 1);
+  const breakdown: ScoreBreakdown[] = Array.from(byType.entries()).map(([signalType, list]) => {
+    const avgImpact = list.reduce((s, x) => s + x.impact * recencyFactor(x.observedAt), 0) / list.length;
+    const avgConfidence = list.reduce((s, x) => s + clamp(x.confidence, 0, 1), 0) / list.length;
+    const weighted = avgImpact * WEIGHTS[signalType];
+    const confidenceAdjusted = weighted * avgConfidence;
     return {
       signalType,
-      rawAverage: round2(rawAverage),
+      rawAverage: round2(avgImpact),
       weighted: round2(weighted),
       confidenceAdjusted: round2(confidenceAdjusted),
     };
   });
 
-  const preClamp = breakdown.reduce((sum, item) => sum + item.confidenceAdjusted, 0);
-  const score = round2(clamp(preClamp, config.clampMin, config.clampMax));
+  const netImpact = breakdown.reduce((s, x) => s + x.confidenceAdjusted, 0);
+  const stackingMultiplier = signals.length >= 8 ? 1.15 : signals.length >= 5 ? 1.08 : 1;
+  const hiringScore = round2(clamp(50 + netImpact * stackingMultiplier, 0, 100));
+
+  const confidenceScore = round2(
+    clamp(signals.length * 8, 0, 40) +
+      clamp((signals.reduce((s, x) => s + x.confidence, 0) / Math.max(signals.length, 1)) * 60, 0, 60),
+  );
 
   const reasons = breakdown
-    .filter((item) => item.confidenceAdjusted > 0)
-    .sort((a, b) => b.confidenceAdjusted - a.confidenceAdjusted)
+    .sort((a, b) => Math.abs(b.confidenceAdjusted) - Math.abs(a.confidenceAdjusted))
     .slice(0, 3)
-    .map((item) => `${item.signalType}: ${item.confidenceAdjusted}`);
+    .map((x) => `${x.signalType}: ${x.confidenceAdjusted}`);
 
+  return { companyId, hiringScore, confidenceScore, modelVersion: MODEL_VERSION, computedAt: new Date().toISOString(), reasons, breakdown };
+}
+
+export function predictHiring(companyId: string, signals: CompanySignal[]): HiringPrediction {
+  const score = computeHiringScore(companyId, signals);
+  const expectedRoleClusters = signals.some((s) => s.signalType === 'patent_filing' || s.signalType === 'product_launch')
+    ? ['engineering', 'product', 'data']
+    : ['sales', 'operations'];
+  const expectedHiringWindowDays = score.hiringScore >= 70 ? 45 : score.hiringScore >= 55 ? 75 : 120;
   return {
-    candidateId,
-    score,
-    modelVersion: config.modelVersion,
+    companyId,
+    hiringProbability: round2(score.hiringScore / 100),
+    expectedRoleClusters,
+    expectedHiringWindowDays,
     computedAt: new Date().toISOString(),
-    reasons,
-    breakdown,
   };
 }
