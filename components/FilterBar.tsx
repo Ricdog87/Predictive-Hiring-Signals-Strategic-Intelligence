@@ -64,11 +64,11 @@ export function FilterBar({
     <div className="panel">
       <div className="panel-header">
         <div className="flex items-center gap-3">
-          <span className="label-eyebrow">Query</span>
+          <span className="label-eyebrow">Query Console</span>
           <span className="font-mono text-[11px] text-text-secondary">
             <span className="text-accent-cyan">{resultCount}</span>
             <span className="text-text-faint"> / {totalCount}</span>
-            <span className="ml-2 text-text-muted">companies</span>
+            <span className="ml-2 text-text-muted">companies on radar</span>
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -77,7 +77,7 @@ export function FilterBar({
               onClick={reset}
               className="font-mono text-2xs uppercase tracking-wider text-text-muted hover:text-accent-cyan"
             >
-              ✕ Clear
+              ✕ Clear query
             </button>
           )}
           <span className="label-eyebrow text-text-faint">⌘F</span>
@@ -98,7 +98,7 @@ export function FilterBar({
         </div>
 
         <div className="flex items-center gap-2 rounded-sm border border-bg-border bg-bg-surface px-3 py-1.5">
-          <span className="label-eyebrow">Min PHS</span>
+          <span className="label-eyebrow">Min Hiring Score</span>
           <input
             type="range"
             min={0}
@@ -125,7 +125,7 @@ export function FilterBar({
           }
           className="rounded-sm border border-bg-border bg-bg-surface px-3 py-1.5 font-mono text-[12px] text-text-primary focus:border-accent-cyan/60 focus:outline-none"
         >
-          <option value="all">All signal types</option>
+          <option value="all">All company signal types</option>
           {(Object.keys(categoryLabels) as SignalCategory[]).map((c) => (
             <option key={c} value={c}>
               {categoryLabels[c]}
@@ -135,7 +135,7 @@ export function FilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-bg-border px-3 py-2">
-        <span className="label-eyebrow w-14 shrink-0">Industry</span>
+        <span className="label-eyebrow w-14 shrink-0">Sector</span>
         {INDUSTRIES.map((ind) => {
           const active = state.industries.includes(ind);
           return (

@@ -16,13 +16,19 @@ const NODES = [
   {
     id: "hermes",
     title: "Hermes",
-    sub: "Signal store + Scoring service",
+    sub: "Signal store",
+    tone: "cyan" as const,
+  },
+  {
+    id: "codex",
+    title: "Codex Engine",
+    sub: "Scoring · Forecasting · Confidence",
     tone: "cyan" as const,
   },
   {
     id: "radar",
     title: "Hiring Radar",
-    sub: "Predictive Intelligence UI",
+    sub: "Intelligence Terminal UI",
     tone: "green" as const,
     active: true,
   },
@@ -50,7 +56,7 @@ export function ArchitectureFlow() {
         <div className="flex items-center gap-3">
           <span className="label-eyebrow">System Topology</span>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            v0.1 mock · target architecture
+            v0.2 · Codex engine · MVP UI
           </span>
         </div>
         <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
@@ -104,10 +110,10 @@ export function ArchitectureFlow() {
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-bg-border pt-4 font-mono text-2xs uppercase tracking-wider text-text-muted">
           <div className="flex items-center gap-3">
-            <Legend dot="bg-accent-green" label="Operational" />
-            <Legend dot="bg-accent-cyan" label="Planned · Hermes" />
-            <Legend dot="bg-accent-violet" label="Planned · n8n" />
-            <Legend dot="bg-accent-amber" label="Planned · MiroFish" />
+            <Legend dot="bg-accent-green" label="Operational · UI" />
+            <Legend dot="bg-accent-cyan" label="Codex engine · Hermes" />
+            <Legend dot="bg-accent-violet" label="Ingestion · n8n" />
+            <Legend dot="bg-accent-amber" label="Surfaces · MiroFish" />
           </div>
           <div className="flex items-center gap-3 text-text-secondary">
             <span>NO HUBSPOT</span>
@@ -126,7 +132,7 @@ export function ArchitectureFlow() {
 
 function Connector() {
   return (
-    <svg width="44" height="14" viewBox="0 0 44 14" fill="none">
+    <svg width="36" height="14" viewBox="0 0 36 14" fill="none">
       <defs>
         <linearGradient id="conn" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.2" />
@@ -134,16 +140,12 @@ function Connector() {
         </linearGradient>
       </defs>
       <path
-        d="M0 7 H36"
+        d="M0 7 H28"
         stroke="url(#conn)"
         strokeWidth="1.4"
         strokeDasharray="3 3"
       />
-      <path
-        d="M36 2 L43 7 L36 12 Z"
-        fill="#22D3EE"
-        fillOpacity="0.85"
-      />
+      <path d="M28 2 L35 7 L28 12 Z" fill="#22D3EE" fillOpacity="0.85" />
     </svg>
   );
 }

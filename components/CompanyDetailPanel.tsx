@@ -7,7 +7,16 @@ import {
   formatRelativeDays,
   strengthStyles,
 } from "@/lib/format";
-import { ScoreBadge } from "./ScoreBadge";
+import {
+  FORECAST_STYLES,
+  getCategoryAttention,
+  getConfidenceScore,
+  getForecastBand,
+  getHiringProbability,
+  isNegativeCompany,
+} from "@/lib/uiDerivations";
+import { HiringScoreBadge, NegativeSignalChip } from "./HiringScoreBadge";
+import { InspectorEmptyState } from "./EmptyStates";
 
 interface CompanyDetailPanelProps {
   company: ScoredCompany | null;
@@ -18,36 +27,17 @@ export function CompanyDetailPanel({
   company,
   onClose,
 }: CompanyDetailPanelProps) {
-  if (!company) {
-    return (
-      <aside className="panel sticky top-[120px] hidden h-fit p-6 xl:block">
-        <div className="label-eyebrow mb-3">Inspector</div>
-        <div className="rounded-sm border border-dashed border-bg-rule bg-bg-surface/40 p-6 text-[12px] text-text-muted">
-          Select a row in the radar to inspect the score breakdown,
-          leadership/tech-stack movement, and signal stream.
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-bg-border bg-bg-border">
-          {[
-            { label: "Drivers", value: "—" },
-            { label: "Signals", value: "—" },
-            { label: "Window", value: "—" },
-          ].map((b) => (
-            <div key={b.label} className="bg-bg-panel p-3">
-              <div className="label-eyebrow">{b.label}</div>
-              <div className="num mt-1 text-base text-text-primary">
-                {b.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      </aside>
-    );
-  }
+  if (!company) return <InspectorEmptyState />;
 
   const s = strengthStyles[company.strength];
+  const probability = getHiringProbability(company);
+  const confidence = getConfidenceScore(company);
+  const band = getForecastBand(company);
+  const f = FORECAST_STYLES[band];
+  const negative = isNegativeCompany(company);
 
   return (
-    <aside className="panel sticky top-[120px] h-fit overflow-hidden xl:block">
+    <aside className="panel sticky top-[160px] h-fit overflow-hidden">
       <div className="panel-header">
         <div className="flex items-center gap-2">
           <span className="label-eyebrow">Inspector</span>
@@ -64,8 +54,9 @@ export function CompanyDetailPanel({
       </div>
 
       <div className="flex items-start gap-4 border-b border-bg-border bg-panel-gradient p-5">
-        <ScoreBadge
+        <HiringScoreBadge
           score={company.score}
+          confidence={confidence}
           strength={company.strength}
           size="lg"
         />
@@ -84,16 +75,39 @@ export function CompanyDetailPanel({
           <div className="mt-1 font-mono text-2xs uppercase tracking-wider text-text-faint">
             {company.headquarters}
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={`chip ${s.text} ${s.ring} bg-bg-surface`}>
               <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
               {s.label}
             </span>
+            <span className={`chip ${f.tone} ${f.ring} bg-bg-surface`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${f.dot}`} />
+              {f.label}
+            </span>
             <span className="chip ring-bg-rule text-text-secondary">
               {company.fundingStage}
             </span>
+            {negative && <NegativeSignalChip />}
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-px border-b border-bg-border bg-bg-border">
+        <Headline label="Hiring Score" value={company.score.toString()} tone="cyan" hint={`${company.strength}`} />
+        <Headline
+          label="Probability"
+          value={`${probability}%`}
+          tone="violet"
+          hint="next 90d"
+        />
+        <Headline
+          label="Confidence"
+          value={confidence.toString()}
+          tone={
+            confidence >= 80 ? "green" : confidence >= 50 ? "ink" : "amber"
+          }
+          hint={`${company.signals.length} signals`}
+        />
       </div>
 
       <div className="border-b border-bg-border p-5">
@@ -120,8 +134,18 @@ export function CompanyDetailPanel({
       </div>
 
       <div className="grid grid-cols-3 gap-px border-b border-bg-border bg-bg-border">
-        <Stat label="Employees" value={company.employees.toLocaleString()} hint={formatPct(company.employeeGrowth90d)} hintTone={company.employeeGrowth90d >= 0 ? "up" : "down"} />
-        <Stat label="Open roles" value={company.openRoles.toString()} hint={formatPct(company.rolesGrowth30d)} hintTone={company.rolesGrowth30d >= 0 ? "up" : "down"} />
+        <Stat
+          label="Employees"
+          value={company.employees.toLocaleString()}
+          hint={formatPct(company.employeeGrowth90d)}
+          hintTone={company.employeeGrowth90d >= 0 ? "up" : "down"}
+        />
+        <Stat
+          label="Open roles"
+          value={company.openRoles.toString()}
+          hint={formatPct(company.rolesGrowth30d)}
+          hintTone={company.rolesGrowth30d >= 0 ? "up" : "down"}
+        />
         <Stat
           label="Funding"
           value={
@@ -131,7 +155,7 @@ export function CompanyDetailPanel({
           }
           hint={
             company.lastFundingMonthsAgo > 0
-              ? `${company.lastFundingMonthsAgo}mo`
+              ? `${company.lastFundingMonthsAgo}mo ago`
               : "—"
           }
         />
@@ -161,36 +185,89 @@ export function CompanyDetailPanel({
 
       <div className="border-t border-bg-border p-5">
         <div className="label-eyebrow mb-3 flex items-center justify-between">
-          <span>Recent Signals</span>
+          <span>Recent Company Signals</span>
           <span className="text-text-faint">{company.signals.length}</span>
         </div>
         <ul className="relative space-y-3">
           <span className="absolute left-[7px] top-1 bottom-1 w-px bg-bg-rule" />
-          {company.signals.map((sg) => (
-            <li key={sg.id} className="relative pl-6">
-              <span className="absolute left-0 top-1.5 h-3.5 w-3.5 rounded-full border border-accent-cyan/50 bg-bg-base">
-                <span className="absolute inset-1 rounded-full bg-accent-cyan/70" />
-              </span>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
-                  {categoryLabels[sg.category]}
+          {company.signals.map((sg) => {
+            const attention = getCategoryAttention(sg.category);
+            const dotColor =
+              attention === "negative"
+                ? "bg-accent-red/80"
+                : attention === "positive"
+                ? "bg-accent-green/80"
+                : "bg-accent-cyan/70";
+            const ringColor =
+              attention === "negative"
+                ? "border-accent-red/50"
+                : attention === "positive"
+                ? "border-accent-green/50"
+                : "border-accent-cyan/50";
+            return (
+              <li key={sg.id} className="relative pl-6">
+                <span
+                  className={`absolute left-0 top-1.5 h-3.5 w-3.5 rounded-full border ${ringColor} bg-bg-base`}
+                >
+                  <span className={`absolute inset-1 rounded-full ${dotColor}`} />
                 </span>
-                <span className="font-mono text-2xs text-text-faint">
-                  {formatRelativeDays(sg.detectedAt)}
-                </span>
-              </div>
-              <div className="mt-0.5 text-[12.5px] text-text-primary">
-                {sg.title}
-              </div>
-              <div className="mt-1 flex items-center justify-between font-mono text-2xs text-text-muted">
-                <span>{sg.source}</span>
-                <span>conf {(sg.confidence * 100).toFixed(0)}%</span>
-              </div>
-            </li>
-          ))}
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
+                    {categoryLabels[sg.category]}
+                  </span>
+                  <span className="font-mono text-2xs text-text-faint">
+                    {formatRelativeDays(sg.detectedAt)}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[12.5px] text-text-primary">
+                  {sg.title}
+                </div>
+                <div className="mt-1 flex items-center justify-between font-mono text-2xs text-text-muted">
+                  <span>{sg.source}</span>
+                  <span>conf {(sg.confidence * 100).toFixed(0)}%</span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </aside>
+  );
+}
+
+function Headline({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone?: "cyan" | "violet" | "green" | "ink" | "amber";
+  hint?: string;
+}) {
+  const fg =
+    tone === "cyan"
+      ? "text-accent-cyan"
+      : tone === "violet"
+      ? "text-accent-violet"
+      : tone === "green"
+      ? "text-accent-green"
+      : tone === "ink"
+      ? "text-accent-ink"
+      : tone === "amber"
+      ? "text-accent-amber"
+      : "text-text-primary";
+  return (
+    <div className="bg-bg-panel p-3">
+      <div className="label-eyebrow">{label}</div>
+      <div className={`num mt-1 text-2xl font-semibold ${fg}`}>{value}</div>
+      {hint && (
+        <div className="font-mono text-2xs uppercase tracking-wider text-text-muted">
+          {hint}
+        </div>
+      )}
+    </div>
   );
 }
 

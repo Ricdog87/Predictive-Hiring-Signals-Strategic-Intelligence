@@ -1,16 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Header } from "@/components/Header";
-import { Sidebar } from "@/components/Sidebar";
-import { KpiCards } from "@/components/KpiCards";
+import { MarketPulseHeader } from "@/components/MarketPulseHeader";
+import { IntelligenceSidebar } from "@/components/IntelligenceSidebar";
 import { FilterBar } from "@/components/FilterBar";
-import { SignalTable } from "@/components/SignalTable";
+import { CompanySignalTable } from "@/components/CompanySignalTable";
 import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
 import { SignalTimeline } from "@/components/SignalTimeline";
+import { ForecastPanel } from "@/components/ForecastPanel";
+import { SectorOverview } from "@/components/SectorOverview";
+import { WatchlistPanel } from "@/components/WatchlistPanel";
 import { ArchitectureFlow } from "@/components/ArchitectureFlow";
 import { MOCK_COMPANIES } from "@/lib/mockData";
 import { scoreAll } from "@/lib/scoring";
+import { computeMarketPulse } from "@/lib/uiDerivations";
 import type { FilterState } from "@/lib/types";
 
 const INITIAL_FILTERS: FilterState = {
@@ -55,29 +58,26 @@ export default function DashboardPage() {
     scored.find((c) => c.id === selectedId) ??
     null;
 
+  const pulse = useMemo(() => computeMarketPulse(filtered), [filtered]);
+
+  const clearFilters = () => setFilters(INITIAL_FILTERS);
+
   return (
     <div className="relative min-h-screen bg-bg-base">
       <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-60" />
 
       <div className="relative flex min-h-screen">
-        <Sidebar />
+        <IntelligenceSidebar />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <Header />
+          <MarketPulseHeader pulse={pulse} />
 
           <main className="flex-1 px-5 py-5">
-            <SectionTitle
-              eyebrow="01 · Overview"
-              title="Predictive Hiring Score · Live Radar"
-              hint="Snapshot of all tracked companies, ranked by PHS"
-            />
-            <KpiCards companies={filtered} />
-
-            <div className="mt-6">
+            <div>
               <SectionTitle
-                eyebrow="02 · Query"
+                eyebrow="01 · Query"
                 title="Filter Console"
-                hint="Search · score floor · category · industry · region"
+                hint="Search · score floor · signal type · sector · region"
               />
               <FilterBar
                 state={filters}
@@ -87,28 +87,29 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
+            <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
               <div className="min-w-0 space-y-5">
                 <div>
                   <SectionTitle
-                    eyebrow="03 · Companies"
-                    title="Hiring Signal Radar"
+                    eyebrow="02 · Companies"
+                    title="Company Signal Radar"
                     hint="Click any row to load the inspector panel"
                   />
-                  <SignalTable
+                  <CompanySignalTable
                     companies={filtered}
                     selectedId={selected?.id ?? null}
                     onSelect={(id) =>
                       setSelectedId((prev) => (prev === id ? null : id))
                     }
+                    onClearFilters={clearFilters}
                   />
                 </div>
               </div>
               <div className="min-w-0">
                 <SectionTitle
-                  eyebrow="04 · Inspector"
+                  eyebrow="03 · Inspector"
                   title="Company Detail"
-                  hint="Score breakdown, drivers, signal stream"
+                  hint="Hiring score · confidence · signal stream"
                 />
                 <CompanyDetailPanel
                   company={selected}
@@ -119,26 +120,55 @@ export default function DashboardPage() {
 
             <div className="mt-6">
               <SectionTitle
-                eyebrow="05 · Temporal"
+                eyebrow="04 · Forecast"
+                title="Predicted Role Clusters · Forecast Window"
+                hint="UI projection from Codex engine outputs"
+              />
+              <ForecastPanel company={selected} />
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle
+                eyebrow="05 · Sectors"
+                title="Sector Pulse"
+                hint="Score, confidence and momentum aggregated by sector"
+              />
+              <SectorOverview companies={filtered} />
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle
+                eyebrow="06 · Temporal"
                 title="Signal Timeline · 90 days"
-                hint="Aggregate event volume + per-category density"
+                hint="Aggregate event volume · per-category density · negative flags"
               />
               <SignalTimeline companies={filtered} />
             </div>
 
             <div className="mt-6">
               <SectionTitle
-                eyebrow="06 · System"
+                eyebrow="07 · Watchlists"
+                title="Curated Cohorts"
+                hint="UI scaffold · backed by Codex queries in v0.3"
+              />
+              <WatchlistPanel />
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle
+                eyebrow="08 · System"
                 title="Architecture Flow"
-                hint="How the radar plugs into the RSG ecosystem"
+                hint="Sources → n8n → Hermes → Codex → Radar → MiroFish"
               />
               <ArchitectureFlow />
             </div>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">
-              <span>RSG · Predictive Hiring Radar · Strategic Intelligence Terminal</span>
+              <span>
+                RSG · Predictive Hiring Radar · Strategic Intelligence Terminal
+              </span>
               <span className="text-text-faint">
-                v0.1 MVP · UI polish build · designed for Hermes / n8n / MiroFish
+                v0.2 · UI terminal build · Codex engine · read-only intelligence
               </span>
             </footer>
           </main>

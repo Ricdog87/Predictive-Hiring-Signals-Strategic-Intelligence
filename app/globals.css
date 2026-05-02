@@ -74,6 +74,12 @@ body {
   }
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @layer utilities {
   .bg-grid {
     background-image: linear-gradient(var(--grid) 1px, transparent 1px),
