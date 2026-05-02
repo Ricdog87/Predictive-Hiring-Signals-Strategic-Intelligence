@@ -4,13 +4,15 @@
 
 :root {
   color-scheme: dark;
+  --grid: rgba(125, 211, 252, 0.045);
 }
 
 html,
 body {
-  background-color: #0a0b0f;
-  color: #f4f5f7;
+  background-color: #06070a;
+  color: #e6e8ee;
   min-height: 100vh;
+  font-feature-settings: "ss01", "cv01", "cv11", "tnum";
 }
 
 * {
@@ -18,24 +20,104 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+::selection {
+  background: rgba(34, 211, 238, 0.25);
+  color: #ffffff;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0b0f;
+  background: #06070a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f2330;
+  background: #1b2030;
   border-radius: 8px;
+  border: 2px solid #06070a;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2a3040;
+  background: #2a3142;
 }
 
-.grid-bg {
-  background-image:
-    linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
-  background-size: 32px 32px;
+@layer components {
+  .terminal-rule {
+    background-image: linear-gradient(
+      90deg,
+      rgba(125, 211, 252, 0) 0%,
+      rgba(125, 211, 252, 0.18) 20%,
+      rgba(125, 211, 252, 0.18) 80%,
+      rgba(125, 211, 252, 0) 100%
+    );
+    height: 1px;
+  }
+
+  .panel {
+    @apply rounded-md border border-bg-border bg-bg-panel shadow-panel;
+  }
+
+  .panel-header {
+    @apply flex items-center justify-between border-b border-bg-border px-4 py-2.5;
+  }
+
+  .label-eyebrow {
+    @apply text-2xs uppercase tracking-terminal text-text-muted font-mono;
+  }
+
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-[11px] font-mono uppercase tracking-wider ring-1;
+  }
+}
+
+@layer utilities {
+  .bg-grid {
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+
+  .bg-grid-fade {
+    -webkit-mask-image: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      black 0%,
+      transparent 80%
+    );
+    mask-image: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      black 0%,
+      transparent 80%
+    );
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
+  }
+
+  .divide-rule > * + * {
+    border-top: 1px solid #1b2030;
+  }
+
+  .bracket-l {
+    position: relative;
+  }
+  .bracket-l::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(
+      180deg,
+      rgba(34, 211, 238, 0) 0%,
+      rgba(34, 211, 238, 0.6) 50%,
+      rgba(34, 211, 238, 0) 100%
+    );
+  }
 }
