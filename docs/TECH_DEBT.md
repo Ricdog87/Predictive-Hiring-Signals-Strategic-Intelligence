@@ -1,46 +1,36 @@
-# TECH_DEBT – Branch `claude/build-dashboard-v1-SFWEP`
+# TECH_DEBT – Build V2
 
-## Status
-Da der Zielbranch nicht bereitsteht, kann keine codebasierte Debt-Messung erfolgen. Nachfolgend steht der **Review-Backlog für die erste echte Analyse**.
+## P0 (kritisch, als Nächstes)
+1. **Runtime Validation an Integrationsgrenzen**
+   - Betroffen: `adapters/*/adapter.ts`
+   - Risiko: Unsichere `unknown` Payloads erzeugen invalide Signals.
+   - Maßnahme: Schema-Validation + Fehlerkanal.
 
-## Debt-Backlog für den realen Branch-Review
+2. **Scoring-Testabdeckung**
+   - Betroffen: `lib/scoring.ts`
+   - Risiko: Regressions bei Gewichtungen/Clamping.
+   - Maßnahme: Unit Tests für Weight-Normalisierung, Edge Cases, deterministische Outputs.
 
-### P0 – Muss unmittelbar geprüft/belegt werden
-1. **Scoring Determinismus (`lib/scoring.ts`)**
-   - Risiko: Nicht reproduzierbare Scores.
-   - Nachweis: identische Inputs => identische Outputs (inkl. Float-Rounding-Strategie).
+3. **API-Vertrag vereinheitlichen**
+   - Betroffen: `app/api/*/route.ts`
+   - Risiko: Uneinheitliche Consumer-Integration.
+   - Maßnahme: `ApiResponse<T>` überall nutzen (inkl. TraceId).
 
-2. **Typkonsistenz (`lib/types.ts` + `lib/mockData.ts`)**
-   - Risiko: Laufzeitfehler trotz TypeScript.
-   - Nachweis: Mockdaten erfüllen vollständig das Domänenmodell.
+## P1 (hoch)
+4. **Persistenz vorbereiten**
+   - Risiko: Kein auditierbarer Verlauf.
+   - Maßnahme: Tabellen für Candidates, Signals, Scores, ScoreBreakdown.
 
-3. **UI-Zustandsabdeckung (Dashboard)**
-   - Risiko: Fehlende Fehler-/Leer-/Ladezustände.
-   - Nachweis: definierte UX für alle Zustandswege.
+5. **Security Hardening**
+   - Risiko: Fehlende Zugriffskontrolle.
+   - Maßnahme: AuthN/AuthZ, Rate Limit, Input-Sanitization.
 
-### P1 – Architekturhärtung
-4. **Component Boundary Hygiene**
-   - Risiko: Prop Drilling / unklare Ownership.
-   - Nachweis: klare Feature-Boundaries und Hook/Service-Schnittstellen.
+6. **Provider-spezifische Mappings präzisieren**
+   - Risiko: Informationsverlust bei Normalisierung.
+   - Maßnahme: Mapping-Konfiguration je Signaltyp/Provider.
 
-5. **Performance-Baseline**
-   - Risiko: Re-Render-Spikes und langsame Interaktionen.
-   - Nachweis: Rendering-Profil und Zielwerte (z. B. p95 Interaction Latency).
-
-6. **Security-Basics**
-   - Risiko: unsichere Datenpfade/Exposition.
-   - Nachweis: Input Validation, sichere Defaults, keine Secrets im Client.
-
-### P2 – Betrieb & Erweiterbarkeit
-7. **Integrationsfähigkeit (Hermes/n8n/MiroFish)**
-   - Risiko: Vendor-Kopplung.
-   - Nachweis: Port-Adapter Contracts dokumentiert und testbar.
-
-8. **Doku-Lücken**
-   - Risiko: Wissensinseln, längere Onboarding-Zeit.
-   - Nachweis: ADRs + Scoring/Operations-Doku aktuell.
-
-## Definition of Done (für den nächsten echten Review-Durchlauf)
-- Alle Findings sind datei- und zeilenkonkret belegt.
-- Jede P0-Feststellung hat einen Patch-Vorschlag.
-- Relevante Tests/Checks wurden ausgeführt und dokumentiert.
+## P2 (mittel)
+7. **Observability**
+   - Maßnahme: Structured Logging + Correlation IDs.
+8. **Performance**
+   - Maßnahme: Caching & batch-fähige Score-Berechnung.

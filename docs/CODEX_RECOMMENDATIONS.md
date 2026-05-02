@@ -1,38 +1,29 @@
-# CODEX Recommendations – Review Plan für `claude/build-dashboard-v1-SFWEP`
+# CODEX Recommendations – Next Implementation Steps (V2)
 
-## Ziel
-Sobald der echte Branch verfügbar ist, erfolgt eine harte, code-nahe Review mit priorisierten Patch-Empfehlungen.
+## 1) Scoring Engine weiter härten
+- `computeCandidateScore` um:
+  - min. required signals,
+  - stale-signal penalty,
+  - optional provider trust multipliers erweitern.
+- Modellversion bei jeder Regeländerung erhöhen.
 
-## Konkreter Prüfplan
+## 2) Typen und Datenmodell
+- Discriminated unions für provider-spezifische Metadaten einführen.
+- `CandidateSignal.meta` schrittweise von loose Record auf typed submodels umstellen.
 
-1. **Repository/Branch Integrität**
-   - Verifizieren: Branch-Existenz, Commit-Stand, Diff-Basis.
+## 3) API-Struktur produktionsreif machen
+- Response-Envelope standardisieren (`data`, `traceId`, `generatedAt`).
+- Fehlerobjekte vereinheitlichen (`code`, `message`, `details`).
+- `POST /api/signals` und `POST /api/score/recompute` ergänzen.
 
-2. **Next.js Strukturprüfung**
-   - Prüfen auf Routing-Strategie, Data Fetching Pattern, Server/Client Trennung.
+## 4) Adapter-Reifegrad erhöhen
+- Jeder Adapter erhält:
+  - parser/validator,
+  - mapping layer,
+  - recoverable error handling.
+- Contract tests je Adapter gegen fixture payloads.
 
-3. **Datei-Tiefenreview**
-   - `lib/scoring.ts`: Algorithmik, Explainability, Testbarkeit.
-   - `lib/mockData.ts`: Datenqualität, Realitätsnähe, Test-Fitness.
-   - `lib/types.ts`: Typdesign, Evolvierbarkeit, API-Kompatibilität.
-
-4. **Dashboard UI Review**
-   - UX-Zustände, Re-Render-Verhalten, Responsiveness, A11y.
-
-5. **Security & Performance Baseline**
-   - Eingabevalidierung, Datenexposition, schwere Render-Pfade.
-
-6. **Dokumentationsabgleich**
-   - Architektur-, Scoring- und Integrationsdoku auf Aktualität prüfen.
-
-## Erwartete Patch-Kandidaten (nach Sichtung)
-- TS strictness-Härtung (`tsconfig`/Lint).
-- Refactor von Score-Logik zu purem Domain-Service.
-- Typangleichung zwischen `types` und `mockData`.
-- UI State Machine für Loading/Error/Empty.
-- Erweiterbarkeit über Integrations-Ports für Hermes/n8n/MiroFish.
-
-## Freigabekriterien für "Review Complete"
-- Alle Fokusbereiche belegt (Datei + Zeilen).
-- Mindestens ein konkreter Patch pro P0-Risiko.
-- Messbare Verbesserungen (Tests/Checks/Profiling) dokumentiert.
+## 5) Betriebsfähigkeit
+- Feature Flags für neue Scoring-Regeln.
+- Audit-Log für Score-Berechnungen.
+- Metrics: score latency, adapter parse errors, missing signal ratio.

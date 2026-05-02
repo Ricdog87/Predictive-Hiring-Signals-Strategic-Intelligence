@@ -1,60 +1,35 @@
-# Architecture Review – Branch `claude/build-dashboard-v1-SFWEP`
+# Architecture Review – Build V2 Baseline (`codex/build-v2`)
 
 ## Executive Summary
-Angefordert war eine Review des echten Claude-Branches `claude/build-dashboard-v1-SFWEP` (nicht main). Diese Branch-Referenz ist in der vorliegenden lokalen Repository-Kopie weiterhin nicht vorhanden.
+Diese Iteration liefert eine belastbare Backend-/Domain-Basis für das Dashboard ohne UI-Neubau:
+- gehärtete Typen,
+- verbesserte Scoring Engine,
+- erweiterte Mockdaten,
+- vorbereitete API-Struktur,
+- vorbereitete Adapter für Hermes/n8n/MiroFish.
 
-Ich habe vor der Prüfung explizit alle verfügbaren Remotes gefetcht (`git fetch --all --prune`) und anschließend Remote-/Local-Branches gelistet. Ergebnis: Es sind keine Remotes und keine zusätzlichen Branches verfügbar.
+## Architektur-Status
 
-**Folge:** Eine echte Code-Review der angefragten Dateien (`lib/scoring.ts`, `lib/mockData.ts`, `lib/types.ts`) und der Next.js Dashboard-Implementierung konnte hier technisch nicht ausgeführt werden.
+### Positiv umgesetzt
+1. **Domain-first Datenmodell** in `lib/types.ts` mit klaren Kernobjekten (`CandidateProfile`, `CandidateSignal`, `ScoreResult`, `CandidateAggregate`).
+2. **Deterministische Score-Berechnung** in `lib/scoring.ts` inkl. Weight-Normalisierung, Clamping, Breakdown und Reason-Codes.
+3. **Datenfundament** in `lib/mockData.ts` für mehrere Kandidaten, Signalquellen und Signaltypen.
+4. **API-Vorbereitung** über Next.js Route Handler für Kandidaten, Signale und Scoring.
+5. **Integrationsvorbereitung** über Adapter-Interface + provider-spezifische Normalizer.
 
-## Verifizierter Git-Status
-- Gewünschter Branch: `claude/build-dashboard-v1-SFWEP` (nicht vorhanden)
-- Ausgeführte Fetch-Strategie: `git fetch --all --prune`
-- Remote-Branches: keine
-- Verfügbare Branches: nur `work` plus Review-Branch
+### Gaps / nächste Schritte
+1. Runtime-Validierung der Adapter-Payloads (z. B. Zod) ergänzen.
+2. Score-Engine mit Unit Tests und Golden Test Cases absichern.
+3. Persistenzmodell (DB-Schema + Migrations) ergänzen.
+4. API-Antworten auf einheitliches Response-Envelope mit Trace IDs harmonisieren.
 
-## Geplanter Review-Scope (sobald Branch verfügbar)
-1. **Next.js Struktur**
-   - App Router vs. Pages Router Konsistenz
-   - Server/Client Component Boundaries
-   - Datenladepfade und Caching-Strategie
-
-2. **Komponentenarchitektur**
-   - Trennung Presentational/Container
-   - Reusability, Props-Design, State-Lokalisierung
-   - Accessibility (Semantik, Fokus, Aria)
-
-3. **`lib/scoring.ts`**
-   - Determinismus, Pure Functions
-   - Nachvollziehbare Gewichtung/Reason Codes
-   - Numerische Stabilität, Edge Cases, Testbarkeit
-
-4. **`lib/mockData.ts`**
-   - Trennung Demo-/Testdaten
-   - Datenkonsistenz zum Typmodell
-   - Fixture-Strategie für deterministische Tests
-
-5. **`lib/types.ts`**
-   - Domänenmodell-Klarheit
-   - Optionalitäts-/Nullability-Disziplin
-   - Runtime-Validation-Grenzen (z. B. Zod)
-
-6. **Dashboard UI**
-   - Informationsarchitektur
-   - Performance (Rendering, Memoization, Virtualisierung)
-   - Error/Empty/Loading States
-
-7. **Dokumentation**
-   - Architekturentscheidungen (ADRs)
-   - Scoring-Erklärbarkeit
-   - Integrations- und Betriebsrunbooks
-
-## Blocker
-1. Kein konfiguriertes Remote im Repository.
-2. Zielbranch `claude/build-dashboard-v1-SFWEP` fehlt lokal und remote.
-3. Kein implementierter Next.js/TypeScript-Quellcode im Arbeitsbaum.
-
-## Nächste Schritte zur Entblockung
-1. Remote URL hinzufügen oder Repository mit vollständiger Historie bereitstellen.
-2. Branch `claude/build-dashboard-v1-SFWEP` verfügbar machen.
-3. Danach direkte Review mit konkreten Findings auf Datei-/Zeilenebene und gezielten Patches.
+## Fokus-Review je Bereich
+- **Projektstruktur:** Basisstruktur für Domain/Adapter/API vorhanden, aber noch ohne Tests und Persistenz.
+- **TypeScript Qualität:** Typmodell deutlich klarer; noch striktere Guards für `unknown`-Payload nötig.
+- **Komponentenstruktur:** Nicht verändert (bewusst), da Fokus auf Engine/Datenmodell.
+- **Scoring Engine:** Gegenüber Basis robust durch Normalisierung/Clamping/Breakdown.
+- **Datenmodell:** Für V2 vorbereitet (Aggregate + API-kompatible Objekte).
+- **Erweiterbarkeit:** Ports/Adapter für Hermes/n8n/MiroFish vorbereitet.
+- **Security Basics:** Keine Secrets, aber noch keine AuthN/AuthZ-Layer.
+- **Performance:** In-Memory Mockdaten; für echte Last Persistenz + Caching nötig.
+- **Dokumentation:** Review/Debt/Empfehlungen auf Build-V2-Stand aktualisiert.
