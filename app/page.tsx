@@ -1,20 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MarketPulseHeader } from "@/components/MarketPulseHeader";
+import { MarketOverviewHeader } from "@/components/MarketOverviewHeader";
 import { IntelligenceSidebar } from "@/components/IntelligenceSidebar";
 import { FilterBar } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
 import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
 import { SignalTimeline } from "@/components/SignalTimeline";
 import { ForecastPanel } from "@/components/ForecastPanel";
-import { SectorOverview } from "@/components/SectorOverview";
-import { WatchlistPanel } from "@/components/WatchlistPanel";
+import { SectorIntelligencePanel } from "@/components/SectorIntelligencePanel";
+import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
+import { MarketClusterView } from "@/components/MarketClusterView";
 import { ArchitectureFlow } from "@/components/ArchitectureFlow";
 import { MOCK_COMPANIES } from "@/lib/mockData";
 import { scoreAll } from "@/lib/scoring";
-import { computeMarketPulse } from "@/lib/uiDerivations";
-import type { FilterState } from "@/lib/types";
+import {
+  deriveMarketClusters,
+  deriveMarketOverview,
+  deriveRegionTrends,
+  deriveSectorTrends,
+} from "@/lib/marketIntelligence";
+import type { FilterState, Industry, Region } from "@/lib/types";
 
 const INITIAL_FILTERS: FilterState = {
   search: "",
@@ -23,6 +29,25 @@ const INITIAL_FILTERS: FilterState = {
   minScore: 0,
   category: "all",
 };
+
+const ALL_SECTORS: Industry[] = [
+  "AI/ML",
+  "Fintech",
+  "SaaS",
+  "Healthtech",
+  "Cybersecurity",
+  "Climate Tech",
+  "Logistics",
+  "E-Commerce",
+];
+const ALL_REGIONS: Region[] = [
+  "DACH",
+  "Nordics",
+  "UK & Ireland",
+  "BeNeLux",
+  "Iberia",
+  "North America",
+];
 
 export default function DashboardPage() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
@@ -58,7 +83,12 @@ export default function DashboardPage() {
     scored.find((c) => c.id === selectedId) ??
     null;
 
-  const pulse = useMemo(() => computeMarketPulse(filtered), [filtered]);
+  // Market Intelligence — UI-only derivations matching the Codex contract.
+  // Replace with `fetch('/api/...')` once the routes ship.
+  const overview = useMemo(() => deriveMarketOverview(filtered), [filtered]);
+  const sectors = useMemo(() => deriveSectorTrends(filtered), [filtered]);
+  const regions = useMemo(() => deriveRegionTrends(filtered), [filtered]);
+  const clusters = useMemo(() => deriveMarketClusters(filtered), [filtered]);
 
   const clearFilters = () => setFilters(INITIAL_FILTERS);
 
@@ -70,12 +100,43 @@ export default function DashboardPage() {
         <IntelligenceSidebar />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <MarketPulseHeader pulse={pulse} />
+          <MarketOverviewHeader overview={overview} />
 
           <main className="flex-1 px-5 py-5">
             <div>
               <SectionTitle
-                eyebrow="01 · Query"
+                eyebrow="01 · Sector Intelligence"
+                title="Sector Trends · Hottest sectors"
+                hint="signal volume × momentum × confidence · DE/DACH context"
+              />
+              <SectorIntelligencePanel sectors={sectors} />
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle
+                eyebrow="02 · Region Intelligence"
+                title="Regional Hiring Pulse"
+                hint="dominant sectors · momentum · germanyShare on DACH"
+              />
+              <RegionIntelligencePanel regions={regions} />
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle
+                eyebrow="03 · Clusters"
+                title="Sector × Region Heatmap"
+                hint="opportunity / risk levels · dominant signals"
+              />
+              <MarketClusterView
+                clusters={clusters}
+                sectors={ALL_SECTORS}
+                regions={ALL_REGIONS}
+              />
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle
+                eyebrow="04 · Query"
                 title="Filter Console"
                 hint="Search · score floor · signal type · sector · region"
               />
@@ -91,7 +152,7 @@ export default function DashboardPage() {
               <div className="min-w-0 space-y-5">
                 <div>
                   <SectionTitle
-                    eyebrow="02 · Companies"
+                    eyebrow="05 · Companies"
                     title="Company Signal Radar"
                     hint="Click any row to load the inspector panel"
                   />
@@ -107,7 +168,7 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0">
                 <SectionTitle
-                  eyebrow="03 · Inspector"
+                  eyebrow="06 · Inspector"
                   title="Company Detail"
                   hint="Hiring score · confidence · signal stream"
                 />
@@ -120,7 +181,7 @@ export default function DashboardPage() {
 
             <div className="mt-6">
               <SectionTitle
-                eyebrow="04 · Forecast"
+                eyebrow="07 · Forecast"
                 title="Predicted Role Clusters · Forecast Window"
                 hint="UI projection from Codex engine outputs"
               />
@@ -129,16 +190,7 @@ export default function DashboardPage() {
 
             <div className="mt-6">
               <SectionTitle
-                eyebrow="05 · Sectors"
-                title="Sector Pulse"
-                hint="Score, confidence and momentum aggregated by sector"
-              />
-              <SectorOverview companies={filtered} />
-            </div>
-
-            <div className="mt-6">
-              <SectionTitle
-                eyebrow="06 · Temporal"
+                eyebrow="08 · Temporal"
                 title="Signal Timeline · 90 days"
                 hint="Aggregate event volume · per-category density · negative flags"
               />
@@ -147,16 +199,7 @@ export default function DashboardPage() {
 
             <div className="mt-6">
               <SectionTitle
-                eyebrow="07 · Watchlists"
-                title="Curated Cohorts"
-                hint="UI scaffold · backed by Codex queries in v0.3"
-              />
-              <WatchlistPanel />
-            </div>
-
-            <div className="mt-6">
-              <SectionTitle
-                eyebrow="08 · System"
+                eyebrow="09 · System"
                 title="Architecture Flow"
                 hint="Sources → n8n → Hermes → Codex → Radar → MiroFish"
               />
@@ -165,10 +208,10 @@ export default function DashboardPage() {
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">
               <span>
-                RSG · Predictive Hiring Radar · Strategic Intelligence Terminal
+                RSG · Market Intelligence Terminal · DE / DACH focus
               </span>
               <span className="text-text-faint">
-                v0.2 · UI terminal build · Codex engine · read-only intelligence
+                v0.3 · UI consumes typed Codex contracts · read-only intelligence
               </span>
             </footer>
           </main>

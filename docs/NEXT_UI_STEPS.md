@@ -1,15 +1,23 @@
 # Next UI Steps
 
-The v0.2 terminal is visually verkaufbar. The next iterations layer
-interaction depth on top of the existing surfaces — without changing the
-Codex engine contract.
+The v0.3 Market Intelligence Terminal is visually verkaufbar and consumes
+typed Codex contracts. The next iterations layer interaction depth and live
+data on top of the existing surfaces — without changing the engine contract.
 
-## Phase A · Wire data plane
+## Phase A · Wire data plane (highest priority)
 
-- [ ] Replace `MOCK_COMPANIES + scoreAll` with `getCompanies(): Promise<...>`
-      that reads from Codex (Hermes API).
+- [ ] Replace the four `derive*` calls in `app/page.tsx` with `fetch` calls
+      against the Codex Market Intelligence API:
+      - `GET /api/market-overview` → `MarketOverview`
+      - `GET /api/sectors` → `SectorTrend[]`
+      - `GET /api/regions` → `RegionTrend[]`
+      - `GET /api/clusters` → `MarketCluster[]`
+- [ ] Wrap each call in a `getMarketIntelligence()` helper so the four
+      panels stay decoupled from transport details.
+- [ ] Replace `MOCK_COMPANIES + scoreAll` with `getCompanies()` reading from
+      Codex / Hermes.
 - [ ] Replace `getConfidenceScore` and `getRoleClusters` UI fallbacks with
-      the corresponding Codex fields once exposed.
+      Codex-provided fields.
 - [ ] Show `LoadingSkeletons` while data is fetching.
 - [ ] Distinguish `mock` vs `live` source state in the sidebar source list
       from the actual API status, not hard-coded.
@@ -41,13 +49,25 @@ Codex engine contract.
 - [ ] Watchlist detail route (`/watchlists/[id]`) with editable cohorts.
 - [ ] Pin a company / company list to a watchlist from the inspector.
 
-## Phase E · Visual polish
+## Phase E · Market surfaces depth
+
+- [ ] Time-series mode for `MarketOverview` cells (mini sparkline per cell
+      tracking 30d history once Codex exposes snapshots).
+- [ ] Sector detail route (`/sectors/[id]`): drill into a sector's
+      companies, leader board, cohort timeline.
+- [ ] Region detail route (`/regions/[id]`) with country-level split for
+      DACH (DE / AT / CH).
+- [ ] Cluster detail route (`/clusters/[sector]/[region]`).
+- [ ] Heatmap mode toggle for sector signal types (e.g. "show me where
+      `funding_round` is hottest").
+
+## Phase F · Visual polish
 
 - [ ] Add a subtle scanline animation to the ticker on idle.
 - [ ] Add a "compact mode" toggle for analysts on small displays.
 - [ ] Light-mode variant (defer until requested).
 
-## Phase F · Empty / loading / error surfaces
+## Phase G · Empty / loading / error surfaces
 
 - [ ] Use `TableSkeleton`, `KpiSkeleton`, `InspectorSkeleton` during
       cold-start fetches.
