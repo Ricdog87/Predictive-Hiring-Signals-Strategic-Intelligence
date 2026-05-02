@@ -1,16 +1,10 @@
-import { computeCandidateScore } from '../../../lib/scoring';
-import { signals } from '../../../lib/mockData';
+import { computeHiringScore } from '../../../lib/scoring';
+import { getSignals } from '../../../lib/mockData';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const candidateId = url.searchParams.get('candidateId');
-
-  if (!candidateId) {
-    return Response.json({ error: 'candidateId query param is required' }, { status: 400 });
-  }
-
-  const input = signals.filter((signal) => signal.candidateId === candidateId);
-  const result = computeCandidateScore(candidateId, input);
-
-  return Response.json({ data: result, generatedAt: new Date().toISOString() });
+  const companyId = url.searchParams.get('companyId');
+  if (!companyId) return Response.json({ error: 'companyId query param is required' }, { status: 400 });
+  const signals = await getSignals();
+  return Response.json({ data: computeHiringScore(companyId, signals.filter((s) => s.companyId === companyId)), generatedAt: new Date().toISOString() });
 }
