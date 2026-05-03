@@ -71,6 +71,7 @@ export default function DashboardPage() {
     useState<CompanyIntelligenceResponse | null>(null);
   const [intelligenceLoading, setIntelligenceLoading] = useState(false);
   const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,6 +214,24 @@ export default function DashboardPage() {
     scrollToSection("section-companies");
   };
 
+
+
+  const refreshData = () => {
+    setToast('Refreshing market data...');
+    window.location.reload();
+  };
+
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(filtered, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `market-export-${new Date().toISOString()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToast('Export complete');
+  };
+
   const selectedSector =
     filters.industries.length === 1 ? filters.industries[0] : null;
   const selectedRegion = filters.regions.length === 1 ? filters.regions[0] : null;
@@ -236,6 +255,12 @@ export default function DashboardPage() {
           </section>
 
           <main className="flex-1 px-5 py-5">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={refreshData} className="rounded border border-bg-border px-3 py-1 font-mono text-2xs uppercase tracking-wider text-text-secondary hover:border-accent-cyan/70">Refresh</button>
+              <button type="button" onClick={exportData} className="rounded border border-bg-border px-3 py-1 font-mono text-2xs uppercase tracking-wider text-text-secondary hover:border-accent-cyan/70">Export</button>
+              <a href="#" className="rounded border border-accent-cyan/50 px-3 py-1 font-mono text-2xs uppercase tracking-wider text-accent-cyan hover:bg-accent-cyan/10">Request Market Report</a>
+            </div>
+            {toast && <div className="mb-4 rounded border border-accent-cyan/40 bg-accent-cyan/10 px-3 py-2 font-mono text-2xs uppercase tracking-wider text-accent-cyan">{toast}</div>}
             {error && (
               <div className="mb-4 rounded-sm border border-accent-red/40 bg-accent-red/[0.06] px-3 py-2 font-mono text-[11px] text-accent-red">
                 api error · {error}
@@ -382,12 +407,9 @@ export default function DashboardPage() {
             </section>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">
-              <span>
-                RSG · Market Intelligence Terminal · DE / DACH focus
-              </span>
-              <span className="text-text-faint">
-                v1.0 · Codex backend · live API · read-only intelligence
-              </span>
+              <span>RSG · Market Intelligence Terminal · DE / DACH focus</span>
+              <span className="text-text-faint">v1.0 · Codex backend · live API · read-only intelligence</span>
+              <span className="text-text-faint">Legal placeholder · Privacy placeholder · Terms placeholder</span>
             </footer>
           </main>
         </div>
