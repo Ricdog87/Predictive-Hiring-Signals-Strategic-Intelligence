@@ -1,4 +1,5 @@
 import { runIngestionPipeline } from '../src/pipeline/runIngestion';
+import { enrichCompany, getMasterRecordById, resolveCompany } from '../src/companyMaster/match';
 import { CompanyAggregate, CompanyProfile, CompanySignal } from './types';
 import { computeHiringScore, predictHiring } from './scoring';
 
@@ -21,16 +22,18 @@ export async function getCompanies(): Promise<CompanyProfile[]> {
   const now = new Date().toISOString();
   const map = new Map<string, CompanyProfile>();
   for (const s of signals) {
-    if (!map.has(s.companyId)) {
-      map.set(s.companyId, {
-        id: s.companyId,
-        name: String(s.meta?.companyName ?? s.companyId),
-        industry: 'unknown',
-        headquarters: 'unknown',
-        employeeCount: 0,
-        updatedAt: now,
-      });
-    }
+    if (map.has(s.companyId)) continue;
+    const rawName = String(s.meta?.companyName ?? s.companyId);
+    const record = getMasterRecordById(s.companyId) ?? resolveCompany(rawName).record;
+    const enrichment = enrichCompany(record);
+    map.set(s.companyId, {
+      id: s.companyId,
+      name: record?.name ?? rawName,
+      industry: enrichment.sector,
+      headquarters: enrichment.region,
+      employeeCount: enrichment.employeeCount,
+      updatedAt: now,
+    });
   }
   return [...map.values()];
 }
