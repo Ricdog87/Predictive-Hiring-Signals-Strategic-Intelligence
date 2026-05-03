@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RSG · Predictive Hiring Radar",
+  title: "Hiring Radar Intelligence Terminal | RSG AI",
   description:
-    "Strategic intelligence terminal surfacing predictive hiring signals from public market data.",
+    "Predictive Hiring Signals for DACH recruiting markets",
 };
 
 export default function RootLayout({
@@ -25,6 +25,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
+              <link rel="icon" href="/icon" />
       </head>
       <body className="bg-bg-base text-text-primary font-sans antialiased">
         {children}

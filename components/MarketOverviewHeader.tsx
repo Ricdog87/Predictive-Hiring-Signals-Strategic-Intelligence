@@ -8,6 +8,10 @@ import {
 
 interface MarketOverviewHeaderProps {
   overview: MarketOverview;
+  lastUpdated?: string;
+  onRefresh?: () => void;
+  onExportCsv?: () => void;
+  onExportJson?: () => void;
 }
 
 /**
@@ -15,7 +19,7 @@ interface MarketOverviewHeaderProps {
  * fields exposed by GET /api/market-overview rendered as a 7-up density
  * strip. Designed to be glanceable in <2 seconds.
  */
-export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
+export function MarketOverviewHeader({ overview, lastUpdated, onRefresh, onExportCsv, onExportJson }: MarketOverviewHeaderProps) {
   const temp = temperatureForScore(overview.averageHiringScore);
   const t = TEMPERATURE_STYLES[temp];
   return (
@@ -38,6 +42,7 @@ export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
         </div>
         <div className="flex items-center gap-3">
           <Meta label="UTC" value={utcNow()} />
+          <Meta label="Updated" value={lastUpdated ?? "—"} />
           <Meta label="Market" value="DE · DACH" tone="cyan" />
           <Meta label="Engine" value="Codex · MI v1.0" />
           <Meta
@@ -45,9 +50,9 @@ export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
             value={t.label.toUpperCase()}
             tone={temp === "overheated" ? "violet" : "cyan"}
           />
-          <button className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">
-            ⌘K · Search
-          </button>
+          {onRefresh && <button onClick={onRefresh} className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">↻ Refresh</button>}
+          {onExportCsv && <button onClick={onExportCsv} className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">Export CSV</button>}
+          {onExportJson && <button onClick={onExportJson} className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">Export JSON</button>}
           <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-bg-border bg-bg-panel font-mono text-2xs text-text-secondary">
             RD
           </div>
