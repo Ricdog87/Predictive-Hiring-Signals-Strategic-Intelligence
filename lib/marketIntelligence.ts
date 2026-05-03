@@ -62,6 +62,57 @@ export async function fetchCompanyAggregates(): Promise<CompanyAggregate[]> {
   return aggregates;
 }
 
+export interface CompanyIntelligenceResponse {
+  companyId: string;
+  name: string;
+  hiringScore: number;
+  hiringProbability: number;
+  likelyOpenRoles: Array<{
+    cluster: string;
+    weight: number;
+    drivenBy: string[];
+  }>;
+  signalExplanations: Array<{
+    signalType: string;
+    observedAt: string;
+    source: string;
+    impact: number;
+    confidence: number;
+    narrative: string;
+    whyItMatters: string;
+  }>;
+  patternMemory: {
+    totalSignals: number;
+    observedDays: number;
+    signalsPerWeek: number;
+    averageGapDays: number;
+    cadenceStability: number;
+    lastObservedAt: string | null;
+  };
+  seasonality: {
+    peakMonths: number[];
+    quietMonths: number[];
+    monthlyDistribution: Array<{ month: number; share: number }>;
+    detected: boolean;
+  };
+  windows: {
+    p30: number;
+    p60: number;
+    p90: number;
+    expectedPeakDay: number;
+    drivers: Array<{ signalType: string; lagDays: number; weight: number }>;
+  };
+  generatedAt: string;
+}
+
+export function fetchCompanyIntelligence(
+  id: string,
+): Promise<CompanyIntelligenceResponse> {
+  return getJson<CompanyIntelligenceResponse>(
+    `/api/intelligence/${encodeURIComponent(id)}`,
+  );
+}
+
 const SIGNAL_TYPE_LABELS: Record<HiringSignalType, string> = {
   mna_buy: "M&A · acquirer",
   mna_sell: "M&A · target",

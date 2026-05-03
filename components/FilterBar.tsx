@@ -1,7 +1,9 @@
 "use client";
 
+import { useCallback, useRef } from "react";
 import { signalTypeLabel } from "@/lib/marketIntelligence";
 import type { HiringSignalType } from "@/lib/types";
+import { useSearchFocusListener } from "@/lib/uiHooks";
 
 export interface FilterState {
   search: string;
@@ -63,6 +65,16 @@ export function FilterBar({
     state.minScore > 0 ||
     state.category !== "all";
 
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const focusSearch = useCallback(() => {
+    const el = searchRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+  useSearchFocusListener(focusSearch);
+
   return (
     <div className="panel">
       <div className="panel-header">
@@ -83,7 +95,12 @@ export function FilterBar({
               ✕ Clear query
             </button>
           )}
-          <span className="label-eyebrow text-text-faint">⌘F</span>
+          <span
+            className="label-eyebrow rounded-sm border border-bg-border bg-bg-surface px-1.5 py-0.5 text-text-faint"
+            title="Press / or ⌘K to focus search"
+          >
+            / · ⌘K
+          </span>
         </div>
       </div>
 
@@ -93,9 +110,10 @@ export function FilterBar({
             ⌕
           </span>
           <input
+            ref={searchRef}
             value={state.search}
             onChange={(e) => onChange({ ...state, search: e.target.value })}
-            placeholder="Search company, sector, headquarters…"
+            placeholder="Search company, sector, headquarters… (press /)"
             className="w-full rounded-sm border border-bg-border bg-bg-surface px-7 py-1.5 font-mono text-[12px] text-text-primary placeholder:text-text-muted focus:border-accent-cyan/60 focus:outline-none focus:ring-1 focus:ring-accent-cyan/30"
           />
         </div>

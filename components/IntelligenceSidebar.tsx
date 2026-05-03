@@ -1,129 +1,148 @@
 "use client";
 
-import { DATA_SOURCES, PRIMARY_NAV } from "@/lib/uiMockData";
+import { useMemo, useState } from "react";
+import { DATA_SOURCES, PRIMARY_NAV, type DataSourceStatus } from "@/lib/uiMockData";
+import { scrollToSection, useActiveSection } from "@/lib/uiHooks";
+import { DataSourceDetailModal } from "./DataSourceDetailModal";
 
 export function IntelligenceSidebar() {
+  const targetIds = useMemo(() => PRIMARY_NAV.map((n) => n.targetId), []);
+  const activeId = useActiveSection(targetIds);
+  const [openSource, setOpenSource] = useState<DataSourceStatus | null>(null);
+
   return (
-    <aside className="hidden lg:flex w-[236px] shrink-0 flex-col border-r border-bg-border bg-bg-surface">
-      <div className="flex h-12 items-center gap-2.5 border-b border-bg-border px-4">
-        <div className="relative flex h-7 w-7 items-center justify-center rounded-sm bg-accent-cyan/10 ring-1 ring-accent-cyan/40">
-          <span className="font-mono text-[10px] font-semibold tracking-wider text-accent-cyan">
-            RSG
-          </span>
-          <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent-green" />
-        </div>
-        <div className="leading-tight">
-          <div className="text-[12px] font-semibold text-text-primary">
-            Hiring Radar
-          </div>
-          <div className="label-eyebrow">Intelligence Terminal</div>
-        </div>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <SectionHeader label="Workspace" />
-        <ul className="space-y-0.5">
-          {PRIMARY_NAV.map((n) => (
-            <li key={n.id}>
-              <button
-                className={`group flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-[12.5px] transition-colors ${
-                  n.active
-                    ? "bg-accent-cyan/10 text-accent-cyan"
-                    : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
-                }`}
-              >
-                <span
-                  className={`font-mono text-[12px] ${
-                    n.active ? "text-accent-cyan" : "text-text-muted"
-                  }`}
-                >
-                  {n.glyph}
-                </span>
-                <span className="flex-1 text-left">{n.label}</span>
-                {n.active && (
-                  <span className="h-1 w-1 rounded-full bg-accent-cyan" />
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-5">
-          <SectionHeader
-            label="Data Sources"
-            right={`${DATA_SOURCES.length}`}
-          />
-          <ul className="space-y-0.5">
-            {DATA_SOURCES.map((s) => (
-              <li
-                key={s.id}
-                className="rounded-sm px-2 py-1 hover:bg-bg-elevated"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <StatusDot status={s.status} />
-                    <span className="text-[12px] text-text-secondary">
-                      {s.label}
-                    </span>
-                  </div>
-                  <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
-                    {s.status}
-                  </span>
-                </div>
-                <div className="ml-4 flex items-center justify-between font-mono text-2xs text-text-faint">
-                  <span>{s.lastSync}</span>
-                  <span>{s.throughput}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-5">
-          <SectionHeader label="Confidence Tiers" />
-          <ul className="space-y-1 px-2">
-            <ConfidenceLegend label="High" range="≥ 80%" tone="bg-accent-green" />
-            <ConfidenceLegend label="Medium" range="50–79%" tone="bg-accent-cyan" />
-            <ConfidenceLegend label="Low" range="< 50%" tone="bg-accent-amber" />
-          </ul>
-        </div>
-
-        <div className="mt-5">
-          <SectionHeader label="Score Bands" />
-          <ul className="space-y-1 px-2">
-            <ConfidenceLegend label="Critical" range="80–100" tone="bg-accent-violet" />
-            <ConfidenceLegend label="Strong" range="65–79" tone="bg-accent-cyan" />
-            <ConfidenceLegend label="Moderate" range="45–64" tone="bg-accent-amber" />
-            <ConfidenceLegend label="Weak" range="0–44" tone="bg-text-muted" />
-          </ul>
-        </div>
-      </nav>
-
-      <div className="border-t border-bg-border p-3">
-        <div className="rounded-sm border border-bg-border bg-bg-panel p-2.5">
-          <div className="label-eyebrow flex items-center justify-between">
-            <span>Engine</span>
-            <span className="flex items-center gap-1.5 text-accent-green">
-              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent-green" />
-              Online
+    <>
+      <aside className="hidden lg:flex w-[236px] shrink-0 flex-col border-r border-bg-border bg-bg-surface">
+        <div className="flex h-12 items-center gap-2.5 border-b border-bg-border px-4">
+          <div className="relative flex h-7 w-7 items-center justify-center rounded-sm bg-accent-cyan/10 ring-1 ring-accent-cyan/40">
+            <span className="font-mono text-[10px] font-semibold tracking-wider text-accent-cyan">
+              RSG
             </span>
+            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent-green" />
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
-            <div>
-              <div className="label-eyebrow">Latency</div>
-              <div className="num text-text-primary">42ms</div>
+          <div className="leading-tight">
+            <div className="text-[12px] font-semibold text-text-primary">
+              Hiring Radar
             </div>
-            <div>
-              <div className="label-eyebrow">Build</div>
-              <div className="num text-text-primary">v0.2.0</div>
-            </div>
-          </div>
-          <div className="mt-2 border-t border-bg-border pt-2 font-mono text-2xs uppercase tracking-wider text-text-muted">
-            Codex · PHS v1.0
+            <div className="label-eyebrow">Intelligence Terminal</div>
           </div>
         </div>
-      </div>
-    </aside>
+
+        <nav className="flex-1 overflow-y-auto px-2 py-3">
+          <SectionHeader label="Workspace" />
+          <ul className="space-y-0.5">
+            {PRIMARY_NAV.map((n) => {
+              const active = activeId === n.targetId;
+              return (
+                <li key={n.id}>
+                  <button
+                    onClick={() => scrollToSection(n.targetId)}
+                    aria-current={active ? "true" : undefined}
+                    className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-sm px-2 py-1.5 text-[12.5px] transition-colors ${
+                      active
+                        ? "bg-accent-cyan/10 text-accent-cyan"
+                        : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
+                    }`}
+                  >
+                    <span
+                      className={`font-mono text-[12px] ${
+                        active ? "text-accent-cyan" : "text-text-muted"
+                      }`}
+                    >
+                      {n.glyph}
+                    </span>
+                    <span className="flex-1 text-left">{n.label}</span>
+                    {active && (
+                      <span className="h-1 w-1 rounded-full bg-accent-cyan" />
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="mt-5">
+            <SectionHeader
+              label="Data Sources"
+              right={`${DATA_SOURCES.length}`}
+            />
+            <ul className="space-y-0.5">
+              {DATA_SOURCES.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenSource(s)}
+                    className="block w-full cursor-pointer rounded-sm px-2 py-1 text-left transition-colors hover:bg-bg-elevated focus:bg-bg-elevated focus:outline-none focus:ring-1 focus:ring-accent-cyan/30"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={s.status} />
+                        <span className="text-[12px] text-text-secondary">
+                          {s.label}
+                        </span>
+                      </div>
+                      <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
+                        {s.status}
+                      </span>
+                    </div>
+                    <div className="ml-4 flex items-center justify-between font-mono text-2xs text-text-faint">
+                      <span>{s.lastSync}</span>
+                      <span>{s.throughput}</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-5">
+            <SectionHeader label="Confidence Tiers" />
+            <ul className="space-y-1 px-2">
+              <ConfidenceLegend label="High" range="≥ 80%" tone="bg-accent-green" />
+              <ConfidenceLegend label="Medium" range="50–79%" tone="bg-accent-cyan" />
+              <ConfidenceLegend label="Low" range="< 50%" tone="bg-accent-amber" />
+            </ul>
+          </div>
+
+          <div className="mt-5">
+            <SectionHeader label="Score Bands" />
+            <ul className="space-y-1 px-2">
+              <ConfidenceLegend label="Critical" range="80–100" tone="bg-accent-violet" />
+              <ConfidenceLegend label="Strong" range="65–79" tone="bg-accent-cyan" />
+              <ConfidenceLegend label="Moderate" range="45–64" tone="bg-accent-amber" />
+              <ConfidenceLegend label="Weak" range="0–44" tone="bg-text-muted" />
+            </ul>
+          </div>
+        </nav>
+
+        <div className="border-t border-bg-border p-3">
+          <div className="rounded-sm border border-bg-border bg-bg-panel p-2.5">
+            <div className="label-eyebrow flex items-center justify-between">
+              <span>Engine</span>
+              <span className="flex items-center gap-1.5 text-accent-green">
+                <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent-green" />
+                Online
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <div className="label-eyebrow">Latency</div>
+                <div className="num text-text-primary">42ms</div>
+              </div>
+              <div>
+                <div className="label-eyebrow">Build</div>
+                <div className="num text-text-primary">v0.2.0</div>
+              </div>
+            </div>
+            <div className="mt-2 border-t border-bg-border pt-2 font-mono text-2xs uppercase tracking-wider text-text-muted">
+              Codex · PHS v1.0
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <DataSourceDetailModal source={openSource} onClose={() => setOpenSource(null)} />
+    </>
   );
 }
 

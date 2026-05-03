@@ -10,16 +10,26 @@ import {
 import {
   signalTypeLabel,
   signalTypeAttention,
+  type CompanyIntelligenceResponse,
 } from "@/lib/marketIntelligence";
 import { HiringScoreBadge, NegativeSignalChip } from "./HiringScoreBadge";
 import { InspectorEmptyState } from "./EmptyStates";
 
 interface CompanyDetailPanelProps {
   company: CompanyView | null;
+  intelligence?: CompanyIntelligenceResponse | null;
+  intelligenceLoading?: boolean;
+  intelligenceError?: string | null;
   onClose: () => void;
 }
 
-export function CompanyDetailPanel({ company, onClose }: CompanyDetailPanelProps) {
+export function CompanyDetailPanel({
+  company,
+  intelligence,
+  intelligenceLoading,
+  intelligenceError,
+  onClose,
+}: CompanyDetailPanelProps) {
   if (!company) return <InspectorEmptyState />;
 
   const s = strengthStyles[company.strength];
@@ -203,6 +213,12 @@ export function CompanyDetailPanel({ company, onClose }: CompanyDetailPanelProps
         )}
       </div>
 
+      <IntelligenceBlock
+        intelligence={intelligence}
+        loading={Boolean(intelligenceLoading)}
+        error={intelligenceError ?? null}
+      />
+
       <div className="border-t border-bg-border p-5">
         <div className="label-eyebrow mb-3 flex items-center justify-between">
           <span>Recent Company Signals</span>
@@ -330,6 +346,160 @@ function Stat({
           {hint}
         </div>
       )}
+    </div>
+  );
+}
+
+function IntelligenceBlock({
+  intelligence,
+  loading,
+  error,
+}: {
+  intelligence: CompanyIntelligenceResponse | null | undefined;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (loading) {
+    return (
+      <div className="border-t border-bg-border p-5">
+        <div className="label-eyebrow mb-3">Intelligence</div>
+        <div className="font-mono text-2xs uppercase tracking-wider text-text-muted">
+          loading /api/intelligence …
+        </div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="border-t border-bg-border p-5">
+        <div className="label-eyebrow mb-2">Intelligence</div>
+        <div className="font-mono text-2xs uppercase tracking-wider text-accent-amber">
+          api error · {error}
+        </div>
+      </div>
+    );
+  }
+  if (!intelligence) return null;
+
+  const { windows, likelyOpenRoles, signalExplanations, patternMemory } = intelligence;
+  const topExplanation = signalExplanations[0];
+  return (
+    <div className="border-t border-bg-border p-5">
+      <div className="label-eyebrow mb-3 flex items-center justify-between">
+        <span>Intelligence · 30 / 60 / 90 forecast</span>
+        <span className="font-mono text-2xs text-text-faint">
+          peak ~{windows.expectedPeakDay}d
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-px bg-bg-border">
+        <ProbabilityCell label="30d" value={windows.p30} />
+        <ProbabilityCell label="60d" value={windows.p60} />
+        <ProbabilityCell label="90d" value={windows.p90} />
+      </div>
+
+      <div className="mt-4">
+        <div className="label-eyebrow mb-2">Likely open roles</div>
+        {likelyOpenRoles.length === 0 ? (
+          <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
+            insufficient signal
+          </span>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {likelyOpenRoles.map((r) => (
+              <span
+                key={r.cluster}
+                className="chip ring-bg-rule text-text-secondary bg-bg-surface/60"
+                title={`weight ${r.weight} · driven by ${r.drivenBy.join(", ")}`}
+              >
+                {r.cluster}
+                <span className="ml-1 font-mono text-2xs text-text-muted">
+                  ×{r.weight.toFixed(1)}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {topExplanation && (
+        <div className="mt-4">
+          <div className="label-eyebrow mb-1.5">Why now</div>
+          <p className="text-[12.5px] leading-relaxed text-text-secondary">
+            {topExplanation.narrative}{" "}
+            <span className="font-mono text-2xs text-text-faint">
+              · {topExplanation.whyItMatters}
+            </span>
+          </p>
+        </div>
+      )}
+
+      {signalExplanations.length > 1 && (
+        <div className="mt-4">
+          <div className="label-eyebrow mb-2">Signal explanations</div>
+          <ul className="space-y-2">
+            {signalExplanations.slice(0, 4).map((e, idx) => (
+              <li
+                key={`${e.signalType}-${e.observedAt}-${idx}`}
+                className="rounded-sm border border-bg-line/50 bg-bg-surface/40 px-2.5 py-1.5"
+              >
+                <div className="flex items-center justify-between font-mono text-2xs uppercase tracking-wider text-text-muted">
+                  <span>{e.signalType.replace(/_/g, " ")}</span>
+                  <span className="text-text-faint">{e.source}</span>
+                </div>
+                <div className="mt-0.5 text-[12px] text-text-secondary">
+                  {e.narrative}
+                </div>
+                <div className="mt-0.5 font-mono text-2xs text-text-faint">
+                  {e.whyItMatters}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-3 gap-px bg-bg-border">
+        <Mini label="Cadence" value={`${patternMemory.signalsPerWeek}/wk`} />
+        <Mini label="Avg gap" value={`${patternMemory.averageGapDays}d`} />
+        <Mini
+          label="Stability"
+          value={Math.round(patternMemory.cadenceStability * 100).toString()}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProbabilityCell({ label, value }: { label: string; value: number }) {
+  const pct = Math.round(value * 100);
+  const tone =
+    pct >= 65
+      ? "text-accent-violet"
+      : pct >= 40
+      ? "text-accent-cyan"
+      : "text-text-secondary";
+  const bar =
+    pct >= 65
+      ? "bg-accent-violet"
+      : pct >= 40
+      ? "bg-accent-cyan"
+      : "bg-text-muted";
+  return (
+    <div className="bg-bg-panel p-3">
+      <div className="label-eyebrow">{label}</div>
+      <div className={`num mt-1 text-2xl font-semibold ${tone}`}>{pct}%</div>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-bg-surface ring-1 ring-bg-border">
+        <div className={`h-full ${bar}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-bg-panel p-2.5">
+      <div className="label-eyebrow">{label}</div>
+      <div className="num mt-0.5 text-[13px] text-text-primary">{value}</div>
     </div>
   );
 }

@@ -9,12 +9,19 @@ import { formatPct } from "@/lib/format";
 
 interface SectorIntelligencePanelProps {
   sectors: SectorTrend[];
+  selectedSector?: string | null;
+  onSelectSector?: (sector: string) => void;
 }
 
-export function SectorIntelligencePanel({ sectors }: SectorIntelligencePanelProps) {
+export function SectorIntelligencePanel({
+  sectors,
+  selectedSector,
+  onSelectSector,
+}: SectorIntelligencePanelProps) {
   const top = sectors.slice(0, 3);
   const maxSignals = Math.max(...sectors.map((s) => s.signalVolume), 1);
   const maxCompanies = Math.max(...sectors.map((s) => s.companyCount), 1);
+  const isClickable = Boolean(onSelectSector);
 
   return (
     <div className="panel">
@@ -33,7 +40,13 @@ export function SectorIntelligencePanel({ sectors }: SectorIntelligencePanelProp
       {top.length > 0 && (
         <div className="grid grid-cols-1 gap-px border-b border-bg-border bg-bg-border md:grid-cols-3">
           {top.map((s, i) => (
-            <HottestCard key={s.sector} rank={i + 1} sector={s} />
+            <HottestCard
+              key={s.sector}
+              rank={i + 1}
+              sector={s}
+              selected={selectedSector === s.sector}
+              onSelect={onSelectSector ? () => onSelectSector(s.sector) : undefined}
+            />
           ))}
         </div>
       )}
@@ -55,10 +68,18 @@ export function SectorIntelligencePanel({ sectors }: SectorIntelligencePanelProp
           <tbody>
             {sectors.map((s) => {
               const t = TREND_STYLES[s.trendDirection];
+              const selected = selectedSector === s.sector;
               return (
                 <tr
                   key={s.sector}
-                  className="border-b border-bg-line/50 hover:bg-bg-elevated/40"
+                  onClick={isClickable ? () => onSelectSector?.(s.sector) : undefined}
+                  className={`border-b border-bg-line/50 transition-colors ${
+                    isClickable ? "cursor-pointer" : ""
+                  } ${
+                    selected
+                      ? "bg-accent-cyan/[0.07]"
+                      : "hover:bg-bg-elevated/40"
+                  }`}
                 >
                   <td className="px-3 py-2 align-middle">
                     <div className="font-medium text-text-primary">{s.sector}</div>
@@ -122,10 +143,44 @@ export function SectorIntelligencePanel({ sectors }: SectorIntelligencePanelProp
   );
 }
 
-function HottestCard({ rank, sector }: { rank: number; sector: SectorTrend }) {
+function HottestCard({
+  rank,
+  sector,
+  selected,
+  onSelect,
+}: {
+  rank: number;
+  sector: SectorTrend;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const t = TREND_STYLES[sector.trendDirection];
+  const interactive = Boolean(onSelect);
   return (
-    <div className="relative bg-bg-panel p-4">
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect?.();
+              }
+            }
+          : undefined
+      }
+      className={`relative bg-bg-panel p-4 transition-shadow ${
+        interactive ? "cursor-pointer" : ""
+      } ${
+        selected
+          ? "ring-1 ring-inset ring-accent-cyan/60"
+          : interactive
+          ? "hover:ring-1 hover:ring-inset hover:ring-accent-cyan/30"
+          : ""
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
           <div className="label-eyebrow flex items-center gap-1.5">

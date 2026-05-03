@@ -5,6 +5,8 @@ import type { RegionTrend } from "@/lib/uiContracts/market";
 
 interface RegionIntelligencePanelProps {
   regions: RegionTrend[];
+  selectedRegion?: string | null;
+  onSelectRegion?: (region: string) => void;
 }
 
 const isGermanRegion = (label: string): boolean => {
@@ -18,7 +20,11 @@ const isGermanRegion = (label: string): boolean => {
   );
 };
 
-export function RegionIntelligencePanel({ regions }: RegionIntelligencePanelProps) {
+export function RegionIntelligencePanel({
+  regions,
+  selectedRegion,
+  onSelectRegion,
+}: RegionIntelligencePanelProps) {
   const top = regions.slice(0, 3);
 
   return (
@@ -38,14 +44,25 @@ export function RegionIntelligencePanel({ regions }: RegionIntelligencePanelProp
       {top.length > 0 && (
         <div className="grid grid-cols-1 gap-px border-b border-bg-border bg-bg-border md:grid-cols-3">
           {top.map((r, i) => (
-            <HotRegionCard key={r.region} rank={i + 1} region={r} />
+            <HotRegionCard
+              key={r.region}
+              rank={i + 1}
+              region={r}
+              selected={selectedRegion === r.region}
+              onSelect={onSelectRegion ? () => onSelectRegion(r.region) : undefined}
+            />
           ))}
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-px bg-bg-border md:grid-cols-2 xl:grid-cols-3">
         {regions.map((r) => (
-          <RegionTile key={r.region} region={r} />
+          <RegionTile
+            key={r.region}
+            region={r}
+            selected={selectedRegion === r.region}
+            onSelect={onSelectRegion ? () => onSelectRegion(r.region) : undefined}
+          />
         ))}
         {regions.length === 0 && (
           <div className="bg-bg-panel p-6 text-center font-mono text-2xs uppercase tracking-wider text-text-muted md:col-span-2 xl:col-span-3">
@@ -57,11 +74,45 @@ export function RegionIntelligencePanel({ regions }: RegionIntelligencePanelProp
   );
 }
 
-function HotRegionCard({ rank, region }: { rank: number; region: RegionTrend }) {
+function HotRegionCard({
+  rank,
+  region,
+  selected,
+  onSelect,
+}: {
+  rank: number;
+  region: RegionTrend;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const t = TREND_STYLES[region.trendDirection];
   const isDe = isGermanRegion(region.region);
+  const interactive = Boolean(onSelect);
   return (
-    <div className="relative bg-bg-panel p-4">
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect?.();
+              }
+            }
+          : undefined
+      }
+      className={`relative bg-bg-panel p-4 transition-shadow ${
+        interactive ? "cursor-pointer" : ""
+      } ${
+        selected
+          ? "ring-1 ring-inset ring-accent-cyan/60"
+          : interactive
+          ? "hover:ring-1 hover:ring-inset hover:ring-accent-cyan/30"
+          : ""
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
           <div className="label-eyebrow flex items-center gap-1.5">
@@ -119,7 +170,15 @@ function HotRegionCard({ rank, region }: { rank: number; region: RegionTrend }) 
   );
 }
 
-function RegionTile({ region }: { region: RegionTrend }) {
+function RegionTile({
+  region,
+  selected,
+  onSelect,
+}: {
+  region: RegionTrend;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const t = TREND_STYLES[region.trendDirection];
   const heat =
     region.averageScore >= 70
@@ -128,9 +187,33 @@ function RegionTile({ region }: { region: RegionTrend }) {
       ? "bg-accent-amber"
       : "bg-text-muted";
   const isDe = isGermanRegion(region.region);
+  const interactive = Boolean(onSelect);
 
   return (
-    <div className="bg-bg-panel p-4">
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect?.();
+              }
+            }
+          : undefined
+      }
+      className={`bg-bg-panel p-4 transition-shadow ${
+        interactive ? "cursor-pointer" : ""
+      } ${
+        selected
+          ? "ring-1 ring-inset ring-accent-cyan/60"
+          : interactive
+          ? "hover:ring-1 hover:ring-inset hover:ring-accent-cyan/30"
+          : ""
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

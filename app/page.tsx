@@ -19,12 +19,15 @@ import {
 } from "@/components/LoadingSkeletons";
 import {
   fetchCompanyAggregates,
+  fetchCompanyIntelligence,
   fetchMarketClusters,
   fetchMarketOverview,
   fetchRegionTrends,
   fetchSectorTrends,
+  type CompanyIntelligenceResponse,
 } from "@/lib/marketIntelligence";
 import { toCompanyViews, type CompanyView } from "@/lib/marketView";
+import { scrollToSection, useSearchShortcut } from "@/lib/uiHooks";
 import type {
   MarketCluster,
   MarketOverview,
@@ -57,11 +60,17 @@ const EMPTY: DashboardData = {
 };
 
 export default function DashboardPage() {
+  useSearchShortcut();
+
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [intelligence, setIntelligence] =
+    useState<CompanyIntelligenceResponse | null>(null);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(false);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +106,34 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setIntelligence(null);
+      setIntelligenceError(null);
+      setIntelligenceLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setIntelligenceLoading(true);
+    setIntelligenceError(null);
+    fetchCompanyIntelligence(selectedId)
+      .then((res) => {
+        if (cancelled) return;
+        setIntelligence(res);
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setIntelligence(null);
+        setIntelligenceError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setIntelligenceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
   const sectorOptions = useMemo(
     () => data.sectors.map((s) => s.sector),
@@ -137,6 +174,49 @@ export default function DashboardPage() {
 
   const clearFilters = () => setFilters(INITIAL_FILTERS);
 
+  const toggleSectorFilter = (sector: string) => {
+    setFilters((prev) => {
+      const isOnlyThis =
+        prev.industries.length === 1 && prev.industries[0] === sector;
+      return {
+        ...prev,
+        industries: isOnlyThis ? [] : [sector],
+      };
+    });
+    scrollToSection("section-companies");
+  };
+
+  const toggleRegionFilter = (region: string) => {
+    setFilters((prev) => {
+      const isOnlyThis = prev.regions.length === 1 && prev.regions[0] === region;
+      return {
+        ...prev,
+        regions: isOnlyThis ? [] : [region],
+      };
+    });
+    scrollToSection("section-companies");
+  };
+
+  const focusCluster = (cluster: MarketCluster) => {
+    setFilters((prev) => {
+      const sectorOnly =
+        prev.industries.length === 1 && prev.industries[0] === cluster.sector;
+      const regionOnly =
+        prev.regions.length === 1 && prev.regions[0] === cluster.region;
+      const alreadyTargeted = sectorOnly && regionOnly;
+      return {
+        ...prev,
+        industries: alreadyTargeted ? [] : [cluster.sector],
+        regions: alreadyTargeted ? [] : [cluster.region],
+      };
+    });
+    scrollToSection("section-companies");
+  };
+
+  const selectedSector =
+    filters.industries.length === 1 ? filters.industries[0] : null;
+  const selectedRegion = filters.regions.length === 1 ? filters.regions[0] : null;
+
   return (
     <div className="relative min-h-screen bg-bg-base">
       <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-60" />
@@ -145,13 +225,15 @@ export default function DashboardPage() {
         <IntelligenceSidebar />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {data.overview ? (
-            <MarketOverviewHeader overview={data.overview} />
-          ) : (
-            <div className="border-b border-bg-border bg-bg-surface px-5 py-3 font-mono text-2xs uppercase tracking-terminal text-text-muted">
-              loading market overview…
-            </div>
-          )}
+          <section id="section-radar">
+            {data.overview ? (
+              <MarketOverviewHeader overview={data.overview} />
+            ) : (
+              <div className="border-b border-bg-border bg-bg-surface px-5 py-3 font-mono text-2xs uppercase tracking-terminal text-text-muted">
+                loading market overview…
+              </div>
+            )}
+          </section>
 
           <main className="flex-1 px-5 py-5">
             {error && (
@@ -160,37 +242,45 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div>
+            <section id="section-sectors" className="scroll-mt-24">
               <SectionTitle
                 eyebrow="01 · Sector Intelligence"
                 title="Sector Trends · Hottest sectors"
-                hint="GET /api/sectors · signal volume × momentum × confidence"
+                hint="GET /api/sectors · click a sector to filter companies"
               />
               {loading && data.sectors.length === 0 ? (
                 <KpiSkeleton />
               ) : (
-                <SectorIntelligencePanel sectors={data.sectors} />
+                <SectorIntelligencePanel
+                  sectors={data.sectors}
+                  selectedSector={selectedSector}
+                  onSelectSector={toggleSectorFilter}
+                />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-regions" className="mt-6 scroll-mt-24">
               <SectionTitle
                 eyebrow="02 · Region Intelligence"
                 title="Regional Hiring Pulse"
-                hint="GET /api/regions · dominant sectors · DE focus"
+                hint="GET /api/regions · click a region to filter companies"
               />
               {loading && data.regions.length === 0 ? (
                 <KpiSkeleton />
               ) : (
-                <RegionIntelligencePanel regions={data.regions} />
+                <RegionIntelligencePanel
+                  regions={data.regions}
+                  selectedRegion={selectedRegion}
+                  onSelectRegion={toggleRegionFilter}
+                />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-clusters" className="mt-6 scroll-mt-24">
               <SectionTitle
                 eyebrow="03 · Clusters"
                 title="Sector × Region Heatmap"
-                hint="GET /api/clusters · opportunity / risk / dominant signals"
+                hint="GET /api/clusters · click a cell to filter sector + region"
               />
               {loading && data.clusters.length === 0 ? (
                 <KpiSkeleton />
@@ -199,9 +289,10 @@ export default function DashboardPage() {
                   clusters={data.clusters}
                   sectors={sectorOptions}
                   regions={regionOptions}
+                  onSelectCluster={focusCluster}
                 />
               )}
-            </div>
+            </section>
 
             <div className="mt-6">
               <SectionTitle
@@ -221,11 +312,11 @@ export default function DashboardPage() {
 
             <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
               <div className="min-w-0 space-y-5">
-                <div>
+                <section id="section-companies" className="scroll-mt-24">
                   <SectionTitle
                     eyebrow="05 · Companies"
                     title="Company Signal Radar"
-                    hint="GET /api/companies + /api/company/[id] · click to inspect"
+                    hint="GET /api/companies + /api/company/[id] · click a row to inspect"
                   />
                   {loading && data.companies.length === 0 ? (
                     <TableSkeleton />
@@ -239,51 +330,56 @@ export default function DashboardPage() {
                       onClearFilters={clearFilters}
                     />
                   )}
-                </div>
+                </section>
               </div>
               <div className="min-w-0">
-                <SectionTitle
-                  eyebrow="06 · Inspector"
-                  title="Company Detail"
-                  hint="Hiring score · confidence · signal stream"
-                />
-                {loading && !selected ? (
-                  <InspectorSkeleton />
-                ) : (
-                  <CompanyDetailPanel
-                    company={selected}
-                    onClose={() => setSelectedId(null)}
+                <section id="section-signals" className="scroll-mt-24">
+                  <SectionTitle
+                    eyebrow="06 · Inspector"
+                    title="Company Detail · Signals"
+                    hint="GET /api/intelligence/[id] · 30/60/90 forecast · roles · why-now"
                   />
-                )}
+                  {loading && !selected ? (
+                    <InspectorSkeleton />
+                  ) : (
+                    <CompanyDetailPanel
+                      company={selected}
+                      intelligence={intelligence}
+                      intelligenceLoading={intelligenceLoading}
+                      intelligenceError={intelligenceError}
+                      onClose={() => setSelectedId(null)}
+                    />
+                  )}
+                </section>
               </div>
             </div>
 
-            <div className="mt-6">
+            <section id="section-forecast" className="mt-6 scroll-mt-24">
               <SectionTitle
                 eyebrow="07 · Forecast"
                 title="Predicted Role Clusters · Forecast Window"
                 hint="from /api/company/[id].latestPrediction"
               />
               <ForecastPanel company={selected} />
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-timeline" className="mt-6 scroll-mt-24">
               <SectionTitle
                 eyebrow="08 · Temporal"
                 title="Signal Timeline · 90 days"
                 hint="aggregate event volume · negative-flag overlay"
               />
               <SignalTimeline companies={filtered} />
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-flows" className="mt-6 scroll-mt-24">
               <SectionTitle
                 eyebrow="09 · System"
                 title="Architecture Flow"
                 hint="Sources → n8n → Hermes → Codex → Radar → MiroFish"
               />
               <ArchitectureFlow />
-            </div>
+            </section>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">
               <span>

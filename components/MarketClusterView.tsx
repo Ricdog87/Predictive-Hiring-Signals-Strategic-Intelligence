@@ -23,6 +23,7 @@ interface MarketClusterViewProps {
   clusters: MarketCluster[];
   sectors: string[];
   regions: string[];
+  onSelectCluster?: (cluster: MarketCluster) => void;
 }
 
 type ViewMode = "opportunity" | "risk" | "score";
@@ -31,6 +32,7 @@ export function MarketClusterView({
   clusters,
   sectors,
   regions,
+  onSelectCluster,
 }: MarketClusterViewProps) {
   const [mode, setMode] = useState<ViewMode>("opportunity");
   const [selected, setSelected] = useState<MarketCluster | null>(null);
@@ -38,6 +40,11 @@ export function MarketClusterView({
   useEffect(() => {
     setSelected(clusters[0] ?? null);
   }, [clusters]);
+
+  const handlePick = (cluster: MarketCluster) => {
+    setSelected(cluster);
+    onSelectCluster?.(cluster);
+  };
 
   const lookup = new Map<string, MarketCluster>();
   clusters.forEach((c) => lookup.set(`${c.sector}|${c.region}`, c));
@@ -102,7 +109,7 @@ export function MarketClusterView({
                             ? selected.sector === s && selected.region === r
                             : false
                         }
-                        onClick={() => cell && setSelected(cell)}
+                        onClick={() => cell && handlePick(cell)}
                       />
                     </td>
                   );
@@ -230,7 +237,7 @@ function ClusterCell({
   return (
     <button
       onClick={onClick}
-      className={`relative block h-16 w-full overflow-hidden rounded-sm bg-bg-surface text-left transition-shadow ${ring}`}
+      className={`relative block h-16 w-full cursor-pointer overflow-hidden rounded-sm bg-bg-surface text-left transition-shadow ${ring}`}
       style={{
         backgroundImage: `linear-gradient(135deg, ${baseColor}, transparent 70%)`,
       }}
