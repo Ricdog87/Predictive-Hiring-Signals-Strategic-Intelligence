@@ -23,7 +23,7 @@ interface ApiEnvelope<T> {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(path, { cache: "no-store" });
+  const res = await fetch(path, { next: { revalidate: 30 } });
   if (!res.ok) {
     throw new Error(`${path} failed: ${res.status}`);
   }
