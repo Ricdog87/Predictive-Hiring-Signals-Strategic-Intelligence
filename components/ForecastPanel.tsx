@@ -42,7 +42,7 @@ function ForecastContent({ company }: { company: CompanyView }) {
     clusters.length > 0
       ? Math.max(8, Math.round((company.hiringProbability / 100) * 24))
       : 0;
-  const palette = ["#22D3EE", "#A78BFA", "#34D399", "#FBBF24", "#7DD3FC"];
+  const palette = ["#0E6B85", "#6D4FC4", "#3A8841", "#B07C12", "#1F7E96"];
   const shares = clusters.length === 0
     ? []
     : clusters.map((_, i) => 1 / clusters.length + ((i % 2 === 0 ? 0.05 : -0.05) / clusters.length));

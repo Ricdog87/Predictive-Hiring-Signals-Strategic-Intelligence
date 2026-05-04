@@ -2,6 +2,8 @@
 
 import { TREND_STYLES } from "@/lib/marketIntelligence";
 import type { RegionTrend } from "@/lib/uiContracts/market";
+import { Sparkline, syntheticSeries } from "./Sparkline";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 interface RegionIntelligencePanelProps {
   regions: RegionTrend[];
@@ -60,16 +62,37 @@ export function RegionIntelligencePanel({ regions }: RegionIntelligencePanelProp
 function HotRegionCard({ rank, region }: { rank: number; region: RegionTrend }) {
   const t = TREND_STYLES[region.trendDirection];
   const isDe = isGermanRegion(region.region);
+  const sparkValues = syntheticSeries(
+    region.averageScore,
+    region.trendDirection === "up" ? 0.4 : region.trendDirection === "down" ? -0.3 : 0,
+    22
+  );
+  const sparkColor =
+    region.trendDirection === "up"
+      ? "#3A8841"
+      : region.trendDirection === "down"
+      ? "#BE3C3C"
+      : "#0E6B85";
+  const isHot = region.averageScore >= 75;
   return (
-    <div className="relative bg-bg-panel p-4">
+    <div
+      className={`tilt-card relative cursor-default rounded-md border bg-bg-panel p-4 ${
+        isHot ? "border-accent-cyan/40 glow-cyan" : "border-bg-border"
+      }`}
+    >
+      {isHot && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px overflow-hidden">
+          <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-accent-cyan/60 to-transparent animate-shimmer-slide" />
+        </div>
+      )}
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="label-eyebrow flex items-center gap-1.5">
             <span className="text-accent-cyan">#{rank}</span>
             <span>Hottest region</span>
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-[15px] font-semibold text-text-primary">
+            <span className="truncate text-[15px] font-semibold text-text-primary">
               {region.region}
             </span>
             {isDe && (
@@ -79,23 +102,40 @@ function HotRegionCard({ rank, region }: { rank: number; region: RegionTrend }) 
               </span>
             )}
           </div>
-          <div className="mt-0.5 font-mono text-2xs text-text-muted">
+          <div className="mt-0.5 truncate font-mono text-2xs text-text-muted">
             {region.hottestSectors.slice(0, 3).join(" · ") || "—"}
           </div>
         </div>
         <span className={`font-mono text-base ${t.tone}`}>{t.glyph}</span>
       </div>
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="num text-3xl font-semibold text-accent-cyan">
-          {Math.round(region.averageScore)}
-        </span>
-        <span className="font-mono text-2xs uppercase tracking-terminal text-text-muted">
-          avg score
-        </span>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="flex items-baseline gap-2">
+          <AnimatedNumber
+            value={region.averageScore}
+            decimals={0}
+            className="num text-3xl font-semibold text-accent-cyan"
+          />
+          <span className="font-mono text-2xs uppercase tracking-terminal text-text-muted">
+            avg score
+          </span>
+        </div>
+        <Sparkline
+          values={sparkValues}
+          width={104}
+          height={26}
+          stroke={sparkColor}
+          fill={
+            region.trendDirection === "up"
+              ? "rgba(58,136,65,0.10)"
+              : region.trendDirection === "down"
+              ? "rgba(190,60,60,0.10)"
+              : "rgba(14,107,133,0.10)"
+          }
+        />
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-bg-surface ring-1 ring-bg-border">
         <div
-          className="h-full bg-accent-cyan/80"
+          className="h-full bg-accent-cyan/80 transition-all duration-700 ease-out"
           style={{ width: `${Math.min(100, region.averageScore)}%` }}
         />
       </div>

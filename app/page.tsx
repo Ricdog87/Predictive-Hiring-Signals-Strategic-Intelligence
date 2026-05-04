@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { MarketOverviewHeader } from "@/components/MarketOverviewHeader";
 import { IntelligenceSidebar } from "@/components/IntelligenceSidebar";
+import { WelcomeBanner } from "@/components/WelcomeBanner";
+import { BreakingNewsStrip } from "@/components/BreakingNewsStrip";
+import { CommandPalette } from "@/components/CommandPalette";
+import { StatusBar } from "@/components/StatusBar";
+import { GermanyRegionPanel } from "@/components/GermanyRegionPanel";
+import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
 import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
@@ -11,7 +17,6 @@ import { ForecastPanel } from "@/components/ForecastPanel";
 import { SectorIntelligencePanel } from "@/components/SectorIntelligencePanel";
 import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
 import { MarketClusterView } from "@/components/MarketClusterView";
-import { ArchitectureFlow } from "@/components/ArchitectureFlow";
 import {
   KpiSkeleton,
   TableSkeleton,
@@ -25,6 +30,8 @@ import {
   fetchSectorTrends,
 } from "@/lib/marketIntelligence";
 import { toCompanyViews, type CompanyView } from "@/lib/marketView";
+import { getSessionUser } from "@/lib/session";
+import { DATA_SOURCES } from "@/lib/uiMockData";
 import type {
   MarketCluster,
   MarketOverview,
@@ -56,17 +63,72 @@ const EMPTY: DashboardData = {
   companies: [],
 };
 
+function scrollToAnchor(anchor: string) {
+  if (typeof window === "undefined") return;
+  const el = document.getElementById(anchor);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function openPaletteImperative() {
+  // The CommandPalette toggles on Cmd+K via the global hotkey hub.
+  // Synthesizing the event keeps the palette's state ownership in
+  // one place.
+  if (typeof window === "undefined") return;
+  const isMac = /Mac/i.test(navigator.platform);
+  const ev = new KeyboardEvent("keydown", {
+    key: "k",
+    metaKey: isMac,
+    ctrlKey: !isMac,
+    bubbles: true,
+  });
+  document.dispatchEvent(ev);
+}
+
+const SIGNAL_TYPE_LABELS: Array<{ id: string; label: string }> = [
+  { id: "mna_buy", label: "M&A · Acquirer" },
+  { id: "mna_sell", label: "M&A · Target" },
+  { id: "funding_grant", label: "Funding / Grant" },
+  { id: "job_spike", label: "Hiring spike" },
+  { id: "employee_growth", label: "Headcount growth" },
+  { id: "location_expansion", label: "Expansion" },
+  { id: "new_business_unit", label: "New BU" },
+  { id: "product_launch", label: "Product launch" },
+  { id: "patent_filing", label: "Patent filing" },
+  { id: "gf_change", label: "Leadership change" },
+  { id: "restructuring", label: "Restructuring" },
+  { id: "insolvency", label: "Insolvency" },
+];
+
+const SECTION_TARGETS: Array<{ id: string; label: string; anchor: string }> = [
+  { id: "sectors", label: "Sector Trends", anchor: "section-overview" },
+  { id: "regions", label: "Region Pulse", anchor: "section-sectors" },
+  { id: "clusters", label: "Cluster Heatmap", anchor: "section-regions" },
+  { id: "filter", label: "Filter Console", anchor: "section-clusters" },
+  { id: "companies", label: "Company Radar", anchor: "section-companies" },
+  { id: "forecast", label: "Forecast", anchor: "section-forecast" },
+  { id: "timeline", label: "Signal Timeline", anchor: "section-timeline" },
+];
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const user = useMemo(() => getSessionUser(), []);
+  const sourcesOnline = useMemo(
+    () => DATA_SOURCES.filter((s) => s.status === "live").length,
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      const t0 = performance.now();
       try {
         const [overview, sectors, regions, clusters, aggregates] =
           await Promise.all([
@@ -84,6 +146,8 @@ export default function DashboardPage() {
             ? prev
             : companies[0]?.id ?? null
         );
+        setLatencyMs(performance.now() - t0);
+        setLastSyncAt(new Date().toISOString());
         setError(null);
       } catch (err) {
         if (!cancelled) {
@@ -97,6 +161,14 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  // Bloomberg-style chord navigation
+  useChord("g s", () => scrollToAnchor("section-overview"));
+  useChord("g r", () => scrollToAnchor("section-sectors"));
+  useChord("g c", () => scrollToAnchor("section-regions"));
+  useChord("g co", () => scrollToAnchor("section-companies"));
+  useChord("g f", () => scrollToAnchor("section-forecast"));
+  useChord("g t", () => scrollToAnchor("section-timeline"));
 
   const sectorOptions = useMemo(
     () => data.sectors.map((s) => s.sector),
@@ -139,30 +211,47 @@ export default function DashboardPage() {
 
   return (
     <div className="relative min-h-screen bg-bg-base">
-      <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-60" />
+      <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-40" />
 
       <div className="relative flex min-h-screen">
-        <IntelligenceSidebar />
+        <IntelligenceSidebar
+          user={user}
+          companies={data.companies}
+          onSelectCompany={(id) => {
+            setSelectedId(id);
+            scrollToAnchor("section-companies");
+          }}
+          onOpenPalette={openPaletteImperative}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col">
           {data.overview ? (
-            <MarketOverviewHeader overview={data.overview} />
+            <MarketOverviewHeader overview={data.overview} user={user} />
           ) : (
             <div className="border-b border-bg-border bg-bg-surface px-5 py-3 font-mono text-2xs uppercase tracking-terminal text-text-muted">
               loading market overview…
             </div>
           )}
 
-          <main className="flex-1 px-5 py-5">
+          <WelcomeBanner
+            user={user}
+            overview={data.overview}
+            sourcesOnline={sourcesOnline}
+            totalSources={DATA_SOURCES.length}
+          />
+
+          <BreakingNewsStrip />
+
+          <main className="flex-1 px-5 py-6">
             {error && (
               <div className="mb-4 rounded-sm border border-accent-red/40 bg-accent-red/[0.06] px-3 py-2 font-mono text-[11px] text-accent-red">
                 api error · {error}
               </div>
             )}
 
-            <div>
+            <section id="section-overview" className="scroll-mt-24">
               <SectionTitle
-                eyebrow="01 · Sector Intelligence"
+                eyebrow="Sector Intelligence"
                 title="Sector Trends · Hottest sectors"
                 hint="GET /api/sectors · signal volume × momentum × confidence"
               />
@@ -171,11 +260,11 @@ export default function DashboardPage() {
               ) : (
                 <SectorIntelligencePanel sectors={data.sectors} />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-sectors" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="02 · Region Intelligence"
+                eyebrow="Region Intelligence"
                 title="Regional Hiring Pulse"
                 hint="GET /api/regions · dominant sectors · DE focus"
               />
@@ -184,11 +273,20 @@ export default function DashboardPage() {
               ) : (
                 <RegionIntelligencePanel regions={data.regions} />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-de-regions" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="03 · Clusters"
+                eyebrow="Deutschland · Quadranten"
+                title="Hiring Heat · Nord · Ost · Süd · West"
+                hint="GET /api/regions/de · 16 Bundesländer · Eurostat overlay · Sonar live insight"
+              />
+              <GermanyRegionPanel />
+            </section>
+
+            <section id="section-regions" className="mt-8 scroll-mt-24">
+              <SectionTitle
+                eyebrow="Clusters"
                 title="Sector × Region Heatmap"
                 hint="GET /api/clusters · opportunity / risk / dominant signals"
               />
@@ -201,11 +299,11 @@ export default function DashboardPage() {
                   regions={regionOptions}
                 />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-clusters" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="04 · Query"
+                eyebrow="Query"
                 title="Filter Console"
                 hint="Search · score floor · signal type · sector · region"
               />
@@ -217,13 +315,16 @@ export default function DashboardPage() {
                 sectorOptions={sectorOptions}
                 regionOptions={regionOptions}
               />
-            </div>
+            </section>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
+            <section
+              id="section-companies"
+              className="mt-8 grid grid-cols-1 gap-5 scroll-mt-24 xl:grid-cols-[minmax(0,1fr)_460px]"
+            >
               <div className="min-w-0 space-y-5">
                 <div>
                   <SectionTitle
-                    eyebrow="05 · Companies"
+                    eyebrow="Companies"
                     title="Company Signal Radar"
                     hint="GET /api/companies + /api/company/[id] · click to inspect"
                   />
@@ -243,7 +344,7 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0">
                 <SectionTitle
-                  eyebrow="06 · Inspector"
+                  eyebrow="Inspector"
                   title="Company Detail"
                   hint="Hiring score · confidence · signal stream"
                 />
@@ -256,34 +357,25 @@ export default function DashboardPage() {
                   />
                 )}
               </div>
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-forecast" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="07 · Forecast"
+                eyebrow="Forecast"
                 title="Predicted Role Clusters · Forecast Window"
                 hint="from /api/company/[id].latestPrediction"
               />
               <ForecastPanel company={selected} />
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-timeline" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="08 · Temporal"
+                eyebrow="Temporal"
                 title="Signal Timeline · 90 days"
                 hint="aggregate event volume · negative-flag overlay"
               />
               <SignalTimeline companies={filtered} />
-            </div>
-
-            <div className="mt-6">
-              <SectionTitle
-                eyebrow="09 · System"
-                title="Architecture Flow"
-                hint="Sources → n8n → Hermes → Codex → Radar → MiroFish"
-              />
-              <ArchitectureFlow />
-            </div>
+            </section>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">
               <span>
@@ -294,8 +386,32 @@ export default function DashboardPage() {
               </span>
             </footer>
           </main>
+
+          <StatusBar
+            latencyMs={latencyMs}
+            lastSyncAt={lastSyncAt}
+            apiOk={!error}
+          />
         </div>
       </div>
+
+      <CommandPalette
+        companies={data.companies}
+        sections={SECTION_TARGETS}
+        signalTypes={SIGNAL_TYPE_LABELS}
+        onSelectCompany={(id) => {
+          setSelectedId(id);
+          scrollToAnchor("section-companies");
+        }}
+        onJumpToAnchor={(anchor) => scrollToAnchor(anchor)}
+        onFilterBySignal={(signalType) => {
+          setFilters((f) => ({
+            ...f,
+            category: signalType as FilterState["category"],
+          }));
+          scrollToAnchor("section-clusters");
+        }}
+      />
     </div>
   );
 }

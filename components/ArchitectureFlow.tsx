@@ -73,7 +73,7 @@ export function ArchitectureFlow() {
                 <div
                   className={`relative flex-1 rounded-md border bg-bg-surface px-4 py-3 ring-1 transition-shadow ${
                     n.active
-                      ? "border-accent-green/50 shadow-[0_0_0_1px_rgba(52,211,153,0.2),0_0_30px_-8px_rgba(52,211,153,0.6)]"
+                      ? "border-accent-green/60 shadow-[0_0_0_1px_rgba(58,136,65,0.18),0_0_24px_-8px_rgba(58,136,65,0.45)]"
                       : "border-bg-border"
                   } ${t.ring}`}
                 >
@@ -135,8 +135,8 @@ function Connector() {
     <svg width="36" height="14" viewBox="0 0 36 14" fill="none">
       <defs>
         <linearGradient id="conn" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#22D3EE" stopOpacity="0.85" />
+          <stop offset="0%" stopColor="#0E6B85" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#0E6B85" stopOpacity="0.85" />
         </linearGradient>
       </defs>
       <path
@@ -145,7 +145,7 @@ function Connector() {
         strokeWidth="1.4"
         strokeDasharray="3 3"
       />
-      <path d="M28 2 L35 7 L28 12 Z" fill="#22D3EE" fillOpacity="0.85" />
+      <path d="M28 2 L35 7 L28 12 Z" fill="#0E6B85" fillOpacity="0.85" />
     </svg>
   );
 }
