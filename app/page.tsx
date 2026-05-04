@@ -174,9 +174,9 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div>
+            <section id="section-overview" className="scroll-mt-24">
               <SectionTitle
-                eyebrow="01 · Sector Intelligence"
+                eyebrow="Sector Intelligence"
                 title="Sector Trends · Hottest sectors"
                 hint="GET /api/sectors · signal volume × momentum × confidence"
               />
@@ -185,11 +185,11 @@ export default function DashboardPage() {
               ) : (
                 <SectorIntelligencePanel sectors={data.sectors} />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-sectors" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="02 · Region Intelligence"
+                eyebrow="Region Intelligence"
                 title="Regional Hiring Pulse"
                 hint="GET /api/regions · dominant sectors · DE focus"
               />
@@ -198,11 +198,11 @@ export default function DashboardPage() {
               ) : (
                 <RegionIntelligencePanel regions={data.regions} />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-regions" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="03 · Clusters"
+                eyebrow="Clusters"
                 title="Sector × Region Heatmap"
                 hint="GET /api/clusters · opportunity / risk / dominant signals"
               />
@@ -215,11 +215,11 @@ export default function DashboardPage() {
                   regions={regionOptions}
                 />
               )}
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-clusters" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="04 · Query"
+                eyebrow="Query"
                 title="Filter Console"
                 hint="Search · score floor · signal type · sector · region"
               />
@@ -231,13 +231,16 @@ export default function DashboardPage() {
                 sectorOptions={sectorOptions}
                 regionOptions={regionOptions}
               />
-            </div>
+            </section>
 
-            <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
+            <section
+              id="section-companies"
+              className="mt-8 grid grid-cols-1 gap-5 scroll-mt-24 xl:grid-cols-[minmax(0,1fr)_460px]"
+            >
               <div className="min-w-0 space-y-5">
                 <div>
                   <SectionTitle
-                    eyebrow="05 · Companies"
+                    eyebrow="Companies"
                     title="Company Signal Radar"
                     hint="GET /api/companies + /api/company/[id] · click to inspect"
                   />
@@ -257,7 +260,7 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0">
                 <SectionTitle
-                  eyebrow="06 · Inspector"
+                  eyebrow="Inspector"
                   title="Company Detail"
                   hint="Hiring score · confidence · signal stream"
                 />
@@ -270,25 +273,25 @@ export default function DashboardPage() {
                   />
                 )}
               </div>
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-forecast" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="07 · Forecast"
+                eyebrow="Forecast"
                 title="Predicted Role Clusters · Forecast Window"
                 hint="from /api/company/[id].latestPrediction"
               />
               <ForecastPanel company={selected} />
-            </div>
+            </section>
 
-            <div className="mt-6">
+            <section id="section-timeline" className="mt-8 scroll-mt-24">
               <SectionTitle
-                eyebrow="08 · Temporal"
+                eyebrow="Temporal"
                 title="Signal Timeline · 90 days"
                 hint="aggregate event volume · negative-flag overlay"
               />
               <SignalTimeline companies={filtered} />
-            </div>
+            </section>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">
               <span>

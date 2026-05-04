@@ -223,38 +223,87 @@ function Cell({
   );
 }
 
+interface TickerItem {
+  kind: 'signal' | 'macro';
+  primary: string;
+  delta: string;
+  tone: 'up' | 'down' | 'flat';
+  detail?: string;
+  source?: string;
+}
+
+interface TickerResp {
+  ok: boolean;
+  items: TickerItem[];
+  count: number;
+  macro?: {
+    deUnemployment: { rate: number; period: string } | null;
+  };
+}
+
 function Ticker({ overview }: { overview: MarketOverview }) {
-  const items: [string, string, string][] = [
-    ["DE · AI/ML", "AVG 78", "+22%"],
-    ["DE · FINTECH", "AVG 64", "+12%"],
-    ["DE · CLIMATE", "AVG 59", "+18%"],
-    ["DE · CYBER", "AVG 71", "+09%"],
-    ["DACH · HEALTH", "AVG 68", "+14%"],
-    ["NORDICS · SAAS", "AVG 56", "+04%"],
-    ["UK · AI/ML", "AVG 81", "+31%"],
-    ["MARKET", `AVG ${overview.averageHiringScore}`, "+07%"],
-    ["RISK", `${overview.negativeRiskSignals} signals`, "−"],
-  ];
-  const dup = [...items, ...items];
+  const [items, setItems] = useState<TickerItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/ticker', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as TickerResp;
+        if (!cancelled && json.ok && json.items.length > 0) {
+          setItems(json.items);
+        }
+      } catch {
+        /* keep showing whatever we last had — pipeline must not break */
+      }
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  // Always render *something* — when /api/ticker hasn't responded yet,
+  // fall back to a single market-level pill so the strip isn't empty
+  // on first paint.
+  const display: TickerItem[] =
+    items.length > 0
+      ? items
+      : [
+          {
+            kind: 'macro',
+            primary: 'MARKET',
+            delta: `AVG ${overview.averageHiringScore}`,
+            tone: 'flat',
+          },
+        ];
+
+  // Duplicate for the seamless marquee loop.
+  const looped = [...display, ...display];
+
   return (
     <div className="relative overflow-hidden border-t border-bg-border bg-bg-surface">
       <div className="flex animate-ticker whitespace-nowrap py-1.5">
-        {dup.map(([k, v, d], i) => {
-          const positive = !d.startsWith("−");
+        {looped.map((it, i) => {
+          const toneClass =
+            it.tone === 'up'
+              ? 'text-accent-green'
+              : it.tone === 'down'
+              ? 'text-accent-red'
+              : 'text-accent-cyan';
+          const arrow = it.tone === 'up' ? '▲' : it.tone === 'down' ? '▼' : '·';
           return (
             <span
               key={i}
               className="mx-3 flex items-center gap-2 font-mono text-2xs uppercase tracking-wider"
+              title={it.detail}
             >
-              <span className="text-text-secondary">{k}</span>
-              <span className="text-accent-cyan">{v}</span>
-              <span
-                className={
-                  positive ? "text-accent-green" : "text-accent-red"
-                }
-              >
-                {d}
-              </span>
+              <span className={`${toneClass} font-semibold`}>{arrow}</span>
+              <span className="text-text-secondary">{it.primary}</span>
+              <span className={toneClass}>{it.delta}</span>
               <span className="text-text-faint">·</span>
             </span>
           );

@@ -138,7 +138,7 @@ export function WelcomeBanner({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 bg-bg-surface lg:grid-cols-1 lg:divide-y lg:divide-bg-border">
+        <div className="grid grid-cols-2 bg-bg-surface lg:grid-cols-1 lg:divide-y lg:divide-bg-border">
           <Stat
             label={`Local · ${tzLabel}`}
             value={localStamp}
@@ -169,10 +169,48 @@ export function WelcomeBanner({
             }
             tone="green"
           />
+          <UnemploymentStat />
         </div>
       </div>
     </section>
   );
+}
+
+interface UnemploymentResp {
+  ok: boolean;
+  rate?: number;
+  period?: string;
+  source?: string;
+  fetchedAt?: string;
+}
+
+function UnemploymentStat() {
+  const [snap, setSnap] = useState<UnemploymentResp | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/macro/de-unemployment', {
+          cache: 'force-cache',
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as UnemploymentResp;
+        if (!cancelled) setSnap(json);
+      } catch {
+        // graceful — leave the cell as awaiting
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const value =
+    snap?.ok && typeof snap.rate === 'number' ? `${snap.rate.toFixed(1)}%` : '—';
+  const sub = snap?.ok && snap.period
+    ? `🇩🇪 unemployment · ${snap.period} · Eurostat`
+    : 'Eurostat · monthly';
+  return <Stat label="DE Arbeitslosenquote" value={value} sub={sub} tone="cyan" />;
 }
 
 function Stat({

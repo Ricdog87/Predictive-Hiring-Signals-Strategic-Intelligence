@@ -42,17 +42,17 @@ export interface NavSection {
   id: string;
   label: string;
   glyph: string;
-  active?: boolean;
+  /** DOM id of the dashboard section that should scroll into view. */
+  anchor: string;
   hint?: string;
 }
 
 export const PRIMARY_NAV: NavSection[] = [
-  { id: "radar", label: "Market Radar", glyph: "◎", active: true },
-  { id: "companies", label: "Companies", glyph: "◫" },
-  { id: "signals", label: "Company Signals", glyph: "≈" },
-  { id: "timeline", label: "Signal Timeline", glyph: "⌖" },
-  { id: "forecast", label: "Forecast", glyph: "ℙ" },
-  { id: "sectors", label: "Sector Trends", glyph: "▤" },
-  { id: "regions", label: "Region Trends", glyph: "◬" },
-  { id: "clusters", label: "Cluster Heatmap", glyph: "▦" },
+  { id: "radar", label: "Market Radar", glyph: "◎", anchor: "section-overview" },
+  { id: "sectors", label: "Sector Trends", glyph: "▤", anchor: "section-sectors" },
+  { id: "regions", label: "Region Trends", glyph: "◬", anchor: "section-regions" },
+  { id: "clusters", label: "Cluster Heatmap", glyph: "▦", anchor: "section-clusters" },
+  { id: "companies", label: "Companies", glyph: "◫", anchor: "section-companies" },
+  { id: "forecast", label: "Forecast", glyph: "ℙ", anchor: "section-forecast" },
+  { id: "timeline", label: "Signal Timeline", glyph: "⌖", anchor: "section-timeline" },
 ];

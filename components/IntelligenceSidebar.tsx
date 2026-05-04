@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { DATA_SOURCES, PRIMARY_NAV } from "@/lib/uiMockData";
 import type { SessionUser } from "@/lib/session";
 
@@ -7,7 +8,46 @@ interface IntelligenceSidebarProps {
   user?: SessionUser;
 }
 
+function useActiveSection(anchors: string[]): string | null {
+  const [active, setActive] = useState<string | null>(anchors[0] ?? null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const targets = anchors
+      .map((a) => document.getElementById(a))
+      .filter((x): x is HTMLElement => Boolean(x));
+    if (targets.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]?.target?.id) {
+          setActive(visible[0].target.id);
+        }
+      },
+      {
+        // Mark a section "active" once its top crosses the upper third
+        // of the viewport. Bottom margin keeps the last section selectable.
+        rootMargin: "-30% 0px -55% 0px",
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      }
+    );
+    targets.forEach((t) => observer.observe(t));
+    return () => observer.disconnect();
+  }, [anchors]);
+  return active;
+}
+
+function scrollToAnchor(anchor: string) {
+  if (typeof window === "undefined") return;
+  const el = document.getElementById(anchor);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export function IntelligenceSidebar({ user }: IntelligenceSidebarProps = {}) {
+  const anchors = PRIMARY_NAV.map((n) => n.anchor);
+  const active = useActiveSection(anchors);
   return (
     <aside className="hidden lg:flex w-[236px] shrink-0 flex-col border-r border-bg-border bg-bg-surface">
       <div className="flex h-12 items-center gap-2.5 border-b border-bg-border px-4">
@@ -47,29 +87,35 @@ export function IntelligenceSidebar({ user }: IntelligenceSidebarProps = {}) {
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         <SectionHeader label="Workspace" />
         <ul className="space-y-0.5">
-          {PRIMARY_NAV.map((n) => (
-            <li key={n.id}>
-              <button
-                className={`group flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-[12.5px] transition-colors ${
-                  n.active
-                    ? "bg-accent-cyan/10 text-accent-cyan"
-                    : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
-                }`}
-              >
-                <span
-                  className={`font-mono text-[12px] ${
-                    n.active ? "text-accent-cyan" : "text-text-muted"
+          {PRIMARY_NAV.map((n) => {
+            const isActive = active === n.anchor;
+            return (
+              <li key={n.id}>
+                <button
+                  type="button"
+                  onClick={() => scrollToAnchor(n.anchor)}
+                  aria-current={isActive ? "true" : undefined}
+                  className={`group flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-[12.5px] transition-colors ${
+                    isActive
+                      ? "bg-accent-cyan/10 text-accent-cyan"
+                      : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
                   }`}
                 >
-                  {n.glyph}
-                </span>
-                <span className="flex-1 text-left">{n.label}</span>
-                {n.active && (
-                  <span className="h-1 w-1 rounded-full bg-accent-cyan" />
-                )}
-              </button>
-            </li>
-          ))}
+                  <span
+                    className={`font-mono text-[12px] ${
+                      isActive ? "text-accent-cyan" : "text-text-muted"
+                    }`}
+                  >
+                    {n.glyph}
+                  </span>
+                  <span className="flex-1 text-left">{n.label}</span>
+                  {isActive && (
+                    <span className="h-1 w-1 rounded-full bg-accent-cyan" />
+                  )}
+                </button>
+              </li>
+            );
+          })}
         </ul>
 
         <div className="mt-5">
