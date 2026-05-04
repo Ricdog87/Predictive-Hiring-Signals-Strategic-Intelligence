@@ -7,6 +7,7 @@ import { WelcomeBanner } from "@/components/WelcomeBanner";
 import { BreakingNewsStrip } from "@/components/BreakingNewsStrip";
 import { CommandPalette } from "@/components/CommandPalette";
 import { StatusBar } from "@/components/StatusBar";
+import { GermanyRegionPanel } from "@/components/GermanyRegionPanel";
 import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
@@ -272,6 +273,15 @@ export default function DashboardPage() {
               ) : (
                 <RegionIntelligencePanel regions={data.regions} />
               )}
+            </section>
+
+            <section id="section-de-regions" className="mt-8 scroll-mt-24">
+              <SectionTitle
+                eyebrow="Deutschland · Quadranten"
+                title="Hiring Heat · Nord · Ost · Süd · West"
+                hint="GET /api/regions/de · 16 Bundesländer · Eurostat overlay · Sonar live insight"
+              />
+              <GermanyRegionPanel />
             </section>
 
             <section id="section-regions" className="mt-8 scroll-mt-24">

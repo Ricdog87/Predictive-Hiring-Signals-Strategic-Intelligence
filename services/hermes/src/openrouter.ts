@@ -21,7 +21,7 @@ import { recordRequest } from './lib/budget';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
-export type ModelTier = 'fast' | 'deep';
+export type ModelTier = 'fast' | 'deep' | 'live';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -48,6 +48,8 @@ export interface CompletionResult {
     completion_tokens: number;
     total_tokens: number;
   };
+  /** Source URLs returned by web-online models (Perplexity Sonar). */
+  citations?: string[];
   error?: string;
   fellBack?: boolean;
 }
@@ -57,21 +59,30 @@ const DEFAULT_FAST_MODEL =
   process.env.OPENROUTER_MODEL_FAST?.trim() || 'openai/gpt-4o-mini';
 const DEFAULT_DEEP_MODEL =
   process.env.OPENROUTER_MODEL_DEEP?.trim() || 'anthropic/claude-3.5-haiku';
+const DEFAULT_LIVE_MODEL =
+  process.env.OPENROUTER_MODEL_LIVE?.trim() || 'perplexity/sonar';
 const DEFAULT_MAX_TOKENS_FAST = Number(
   process.env.OPENROUTER_MAX_TOKENS_FAST ?? 600
 );
 const DEFAULT_MAX_TOKENS_DEEP = Number(
   process.env.OPENROUTER_MAX_TOKENS_DEEP ?? 1500
 );
+const DEFAULT_MAX_TOKENS_LIVE = Number(
+  process.env.OPENROUTER_MAX_TOKENS_LIVE ?? 800
+);
 const REFERER = process.env.OPENROUTER_REFERER?.trim() || 'https://rsg-hiring-radar.local';
 const APP_NAME = process.env.OPENROUTER_APP_NAME?.trim() || 'RSG Hermes';
 
 function modelFor(tier: ModelTier): string {
-  return tier === 'deep' ? DEFAULT_DEEP_MODEL : DEFAULT_FAST_MODEL;
+  if (tier === 'deep') return DEFAULT_DEEP_MODEL;
+  if (tier === 'live') return DEFAULT_LIVE_MODEL;
+  return DEFAULT_FAST_MODEL;
 }
 
 function defaultMaxTokens(tier: ModelTier): number {
-  return tier === 'deep' ? DEFAULT_MAX_TOKENS_DEEP : DEFAULT_MAX_TOKENS_FAST;
+  if (tier === 'deep') return DEFAULT_MAX_TOKENS_DEEP;
+  if (tier === 'live') return DEFAULT_MAX_TOKENS_LIVE;
+  return DEFAULT_MAX_TOKENS_FAST;
 }
 
 export function isOpenRouterConfigured(): boolean {
@@ -148,9 +159,20 @@ export async function completion(opts: CompletionOptions): Promise<CompletionRes
     const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
       usage?: CompletionResult['usage'];
-    };
+      citations?: string[];
+      // Some providers return citations on the choice itself.
+      // Keep defensive: pick whichever surface is present.
+    } & Record<string, unknown>;
     const text = json.choices?.[0]?.message?.content?.trim() ?? '';
-    return { ok: true, text, model, usage: json.usage };
+    const citationsRaw =
+      (json.citations as string[] | undefined) ??
+      ((json.choices?.[0] as Record<string, unknown> | undefined)?.[
+        'citations'
+      ] as string[] | undefined);
+    const citations = Array.isArray(citationsRaw)
+      ? citationsRaw.filter((c): c is string => typeof c === 'string')
+      : undefined;
+    return { ok: true, text, model, usage: json.usage, citations };
   } catch (err) {
     const message = (err as Error).message ?? 'unknown';
     return {

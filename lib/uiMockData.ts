@@ -51,6 +51,7 @@ export const PRIMARY_NAV: NavSection[] = [
   { id: "radar", label: "Market Radar", glyph: "◎", anchor: "section-overview" },
   { id: "sectors", label: "Sector Trends", glyph: "▤", anchor: "section-sectors" },
   { id: "regions", label: "Region Trends", glyph: "◬", anchor: "section-regions" },
+  { id: "de-regions", label: "DE · Quadranten", glyph: "🇩🇪", anchor: "section-de-regions" },
   { id: "clusters", label: "Cluster Heatmap", glyph: "▦", anchor: "section-clusters" },
   { id: "companies", label: "Companies", glyph: "◫", anchor: "section-companies" },
   { id: "forecast", label: "Forecast", glyph: "ℙ", anchor: "section-forecast" },

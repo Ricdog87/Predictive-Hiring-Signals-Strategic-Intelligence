@@ -8,7 +8,7 @@
  * counters for a Redis impl behind the same `recordRequest` function.
  */
 
-type Tier = 'fast' | 'deep';
+type Tier = 'fast' | 'deep' | 'live';
 
 interface Window {
   count: number;
@@ -31,10 +31,12 @@ const state: State = {
   perMinute: {
     fast: newWindow(MS_PER_MINUTE),
     deep: newWindow(MS_PER_MINUTE),
+    live: newWindow(MS_PER_MINUTE),
   },
   perDay: {
     fast: newWindow(MS_PER_DAY),
     deep: newWindow(MS_PER_DAY),
+    live: newWindow(MS_PER_DAY),
   },
 };
 
@@ -61,12 +63,12 @@ export interface BudgetDecision {
 
 export function recordRequest(tier: Tier): BudgetDecision {
   const minLimit = limit(
-    tier === 'deep' ? 'HERMES_RPM_DEEP' : 'HERMES_RPM_FAST',
-    tier === 'deep' ? 6 : 30
+    tier === 'deep' ? 'HERMES_RPM_DEEP' : tier === 'live' ? 'HERMES_RPM_LIVE' : 'HERMES_RPM_FAST',
+    tier === 'deep' ? 6 : tier === 'live' ? 4 : 30
   );
   const dayLimit = limit(
-    tier === 'deep' ? 'HERMES_RPD_DEEP' : 'HERMES_RPD_FAST',
-    tier === 'deep' ? 200 : 3000
+    tier === 'deep' ? 'HERMES_RPD_DEEP' : tier === 'live' ? 'HERMES_RPD_LIVE' : 'HERMES_RPD_FAST',
+    tier === 'deep' ? 200 : tier === 'live' ? 100 : 3000
   );
 
   const min = state.perMinute[tier];
@@ -107,7 +109,7 @@ export interface BudgetSnapshot {
 }
 
 export function snapshot(): BudgetSnapshot[] {
-  const tiers: Tier[] = ['fast', 'deep'];
+  const tiers: Tier[] = ['fast', 'deep', 'live'];
   return tiers.map((tier) => {
     const minLimit = limit(
       tier === 'deep' ? 'HERMES_RPM_DEEP' : 'HERMES_RPM_FAST',

@@ -18,6 +18,7 @@ import { healthHandler } from './handlers/health';
 import { analyzeSignalHandler } from './handlers/analyzeSignal';
 import { analyzeCompanyHandler } from './handlers/analyzeCompany';
 import { opportunityBriefHandler } from './handlers/opportunityBrief';
+import { regionalInsightHandler } from './handlers/regionalInsight';
 
 const app = express();
 
@@ -40,6 +41,10 @@ app.post('/analyze-company', (req, res) => {
 
 app.post('/generate-opportunity-brief', (req, res) => {
   void opportunityBriefHandler(req, res);
+});
+
+app.post('/regional-insight', (req, res) => {
+  void regionalInsightHandler(req, res);
 });
 
 app.use((_req, res) => {

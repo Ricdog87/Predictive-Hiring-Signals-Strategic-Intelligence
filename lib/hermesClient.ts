@@ -243,3 +243,39 @@ export async function generateOpportunityBrief(
     timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_DEEP ?? 35_000),
   });
 }
+
+export interface RegionalInsightInput {
+  /** ISO 3166-2:DE code (BW, BY, …) or NUTS-1 (DE1..DEG). */
+  region?: string;
+  /** Plain label, e.g. "Bayern" or "Süd". */
+  label?: string;
+  scope?: 'bundesland' | 'quadrant';
+  context?: {
+    hiringRate?: number;
+    topSectors?: string[];
+    topCompanies?: string[];
+    momentum?: number;
+    unemploymentRate?: number;
+  };
+}
+
+export interface RegionalInsight {
+  headline: string;
+  narrative: string;
+  drivers: string[];
+  watchOuts: string[];
+  rolesInDemand: string[];
+  confidence: number;
+}
+
+export async function regionalInsight(
+  input: RegionalInsightInput
+): Promise<HermesResult<{ insight: RegionalInsight; citations?: string[]; model: string }>> {
+  return call<{ insight: RegionalInsight; citations?: string[]; model: string }>({
+    method: 'POST',
+    path: '/regional-insight',
+    body: input,
+    // Live web search can take a moment — give it a longer leash.
+    timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
+  });
+}
