@@ -279,3 +279,95 @@ export async function regionalInsight(
     timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
   });
 }
+
+// -- Morning Brief ----------------------------------------------------------
+
+export interface MorningBriefInput {
+  role?: string;
+  locale?: string;
+  focusIndustries?: string[];
+  focusRegions?: string[];
+  watchlist?: string[];
+}
+
+export interface MorningBrief {
+  headline: string;
+  summary: string;
+  layoffPulse: Array<{
+    company: string;
+    headcount: number | null;
+    context: string;
+    source: string;
+  }>;
+  hiringPulse: Array<{
+    company: string;
+    context: string;
+    source: string;
+  }>;
+  deals: Array<{
+    type: 'M&A' | 'Funding' | 'Insolvency' | 'Spin-off';
+    companies: string[];
+    summary: string;
+    source: string;
+  }>;
+  macroPulse: string;
+  watchToday: string[];
+  confidence: number;
+}
+
+export async function morningBrief(
+  input: MorningBriefInput
+): Promise<HermesResult<{ brief: MorningBrief; citations?: string[]; model: string }>> {
+  return call<{ brief: MorningBrief; citations?: string[]; model: string }>({
+    method: 'POST',
+    path: '/morning-brief',
+    body: input,
+    timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
+  });
+}
+
+// -- Company Research (search-field backend) -------------------------------
+
+export interface CompanyResearchInput {
+  query: string;
+  region?: string;
+  sector?: string;
+  locale?: string;
+}
+
+export interface CompanyResearch {
+  canonical: string;
+  industry: string;
+  region: string;
+  headquarters: string;
+  employeeCount: number | null;
+  summary: string;
+  hiringPosture:
+    | 'expanding'
+    | 'exploring'
+    | 'consolidating'
+    | 'contracting'
+    | 'unknown';
+  recentSignals: Array<{
+    type: string;
+    title: string;
+    date: string;
+    source: string;
+    url: string;
+  }>;
+  rolesLikely: string[];
+  whyNow: string;
+  risks: string[];
+  confidence: number;
+}
+
+export async function researchCompany(
+  input: CompanyResearchInput
+): Promise<HermesResult<{ research: CompanyResearch; citations?: string[]; model: string }>> {
+  return call<{ research: CompanyResearch; citations?: string[]; model: string }>({
+    method: 'POST',
+    path: '/research-company',
+    body: input,
+    timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
+  });
+}

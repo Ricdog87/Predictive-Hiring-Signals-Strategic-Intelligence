@@ -23,9 +23,11 @@ interface CommandPaletteProps {
   onSelectCompany: (companyId: string) => void;
   onJumpToAnchor: (anchor: string) => void;
   onFilterBySignal?: (signalType: string) => void;
+  /** Optional: invoked when user picks "Research live · <q>" — palette closes. */
+  onResearchCompany?: (query: string) => void;
 }
 
-type ItemKind = "company" | "section" | "signal" | "watch";
+type ItemKind = "company" | "section" | "signal" | "watch" | "research";
 
 interface PaletteItem {
   kind: ItemKind;
@@ -70,6 +72,7 @@ export function CommandPalette({
   onSelectCompany,
   onJumpToAnchor,
   onFilterBySignal,
+  onResearchCompany,
 }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -159,23 +162,43 @@ export function CommandPalette({
   ]);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) {
-      return allItems
+    const trimmed = q.trim();
+    let base: PaletteItem[];
+    if (!trimmed) {
+      base = allItems
         .slice()
         .sort((a, b) => a.rank - b.rank)
         .slice(0, 24);
+    } else {
+      base = allItems
+        .map((it) => {
+          const sLabel = fuzzyScore(trimmed, it.label);
+          const sDetail = it.detail ? fuzzyScore(trimmed, it.detail) : Infinity;
+          return { it, score: Math.min(sLabel, sDetail) };
+        })
+        .filter((x) => Number.isFinite(x.score))
+        .sort((a, b) => a.score - b.score || a.it.rank - b.it.rank)
+        .slice(0, 24)
+        .map((x) => x.it);
     }
-    return allItems
-      .map((it) => {
-        const sLabel = fuzzyScore(q, it.label);
-        const sDetail = it.detail ? fuzzyScore(q, it.detail) : Infinity;
-        return { it, score: Math.min(sLabel, sDetail) };
-      })
-      .filter((x) => Number.isFinite(x.score))
-      .sort((a, b) => a.score - b.score || a.it.rank - b.it.rank)
-      .slice(0, 24)
-      .map((x) => x.it);
-  }, [allItems, q]);
+
+    // Always append a "Research live · <q>" item when the user has typed
+    // at least 3 characters and the radar has a research callback. This
+    // is the search-field-for-any-company escape hatch — Sonar (live web)
+    // researches any firm, not just the ones in the master.
+    if (onResearchCompany && trimmed.length >= 3) {
+      base.push({
+        kind: 'research',
+        id: `research:${trimmed}`,
+        label: `Research live · "${trimmed}"`,
+        detail: 'Live web search via Sonar — works for any company, not just the master',
+        glyph: '✦',
+        invoke: () => onResearchCompany(trimmed),
+        rank: 1000,
+      });
+    }
+    return base;
+  }, [allItems, q, onResearchCompany]);
 
   useEffect(() => {
     if (active >= filtered.length) setActive(0);
@@ -258,6 +281,8 @@ export function CommandPalette({
                         ? "text-accent-violet"
                         : it.kind === "signal"
                         ? "text-accent-green"
+                        : it.kind === "research"
+                        ? "text-accent-violet"
                         : "text-accent-cyan"
                     }`}
                   >

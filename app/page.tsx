@@ -10,6 +10,8 @@ import { StatusBar } from "@/components/StatusBar";
 import { GermanyRegionPanel } from "@/components/GermanyRegionPanel";
 import { MacroStrip } from "@/components/MacroStrip";
 import { JobMarketPanel } from "@/components/JobMarketPanel";
+import { MorningBriefCard } from "@/components/MorningBriefCard";
+import { ResearchModal } from "@/components/ResearchModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
@@ -121,6 +123,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [researchQuery, setResearchQuery] = useState<string | null>(null);
   const user = useMemo(() => getSessionUser(), []);
   const sourcesOnline = useMemo(
     () => DATA_SOURCES.filter((s) => s.status === "live").length,
@@ -242,6 +245,15 @@ export default function DashboardPage() {
             sourcesOnline={sourcesOnline}
             totalSources={DATA_SOURCES.length}
           />
+
+          <ErrorBoundary section="Morning Brief">
+            <MorningBriefCard
+              watchlistCompanies={data.companies.map((c) => ({
+                id: c.id,
+                name: c.name,
+              }))}
+            />
+          </ErrorBoundary>
 
           <ErrorBoundary section="Macro Strip">
             <MacroStrip />
@@ -433,7 +445,10 @@ export default function DashboardPage() {
           }));
           scrollToAnchor("section-clusters");
         }}
+        onResearchCompany={(query) => setResearchQuery(query)}
       />
+
+      <ResearchModal query={researchQuery} onClose={() => setResearchQuery(null)} />
     </div>
   );
 }
