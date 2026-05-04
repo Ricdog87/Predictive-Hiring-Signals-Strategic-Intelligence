@@ -1,11 +1,19 @@
 import { NextRequest } from 'next/server';
 import { buildIntelSnapshot } from '../../../../lib/intelSnapshot';
-import { checkApiKey, denyResponseFor, isAuthEnforced } from '../../../../lib/apiKeys';
+import {
+  checkApiKey,
+  denyResponseFor,
+  isAuthEnforced,
+  refreshKeys,
+} from '../../../../lib/apiKeys';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
+  // Warm the API-key cache so admin-side rotations propagate within
+  // the 60s TTL even without a redeploy.
+  await refreshKeys();
   const auth = checkApiKey(req);
   const denied = denyResponseFor(auth);
   if (denied) return denied;

@@ -274,7 +274,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Sector Intelligence"
                 title="Sector Trends · Hottest sectors"
-                hint="GET /api/sectors · signal volume × momentum × confidence"
+                hint="signal volume × momentum × confidence"
               />
               {loading && data.sectors.length === 0 ? (
                 <KpiSkeleton />
@@ -287,7 +287,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Region Intelligence"
                 title="Regional Hiring Pulse"
-                hint="GET /api/regions · dominant sectors · DE focus"
+                hint="dominant sectors · DE focus"
               />
               {loading && data.regions.length === 0 ? (
                 <KpiSkeleton />
@@ -300,7 +300,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Deutschland · Quadranten"
                 title="Hiring Heat · Nord · Ost · Süd · West"
-                hint="GET /api/regions/de · 16 Bundesländer · Eurostat overlay · Sonar live insight"
+                hint="16 Bundesländer · live macro overlay · RSG Live Intel"
               />
               <ErrorBoundary section="Germany Quadrants">
                 <GermanyRegionPanel />
@@ -311,7 +311,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Clusters"
                 title="Sector × Region Heatmap"
-                hint="GET /api/clusters · opportunity / risk / dominant signals"
+                hint="opportunity / risk / dominant signals"
               />
               {loading && data.clusters.length === 0 ? (
                 <KpiSkeleton />
@@ -327,8 +327,8 @@ export default function DashboardPage() {
             <section id="section-jobmarket" className="mt-8 scroll-mt-24">
               <SectionTitle
                 eyebrow="Job Market"
-                title="DE Job-Posting Pulse · Adzuna"
-                hint="GET /api/jobmarket/pulse · live · 12 Kategorien · refresh 30 min"
+                title="DE Job-Posting Pulse"
+                hint="live · 12 Kategorien · refresh 30 min"
               />
               <ErrorBoundary section="Job Market">
                 <JobMarketPanel />
@@ -360,7 +360,7 @@ export default function DashboardPage() {
                   <SectionTitle
                     eyebrow="Companies"
                     title="Company Signal Radar"
-                    hint="GET /api/companies + /api/company/[id] · click to inspect"
+                    hint="click to inspect"
                   />
                   {loading && data.companies.length === 0 ? (
                     <TableSkeleton />
@@ -397,7 +397,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Forecast"
                 title="Predicted Role Clusters · Forecast Window"
-                hint="from /api/company/[id].latestPrediction"
+                hint="RSG Engine · forward forecast"
               />
               <ForecastPanel company={selected} />
             </section>
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                 RSG · Market Intelligence Terminal · DE / DACH focus
               </span>
               <span className="text-text-faint">
-                v1.0 · Codex backend · live API · read-only intelligence
+                v1.0 · RSG Engine · live · read-only intelligence
               </span>
             </footer>
           </main>

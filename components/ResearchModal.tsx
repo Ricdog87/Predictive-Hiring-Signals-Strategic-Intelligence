@@ -104,7 +104,7 @@ export function ResearchModal({ query, onClose }: ResearchModalProps) {
         <div className="max-h-[78vh] overflow-y-auto">
           {!data && !error && (
             <div className="px-5 py-8 text-center font-mono text-2xs uppercase tracking-terminal text-text-muted">
-              ▸ Sonar (Perplexity) recherchiert live im Web · 5–15 s …
+              ▸ RSG Live Intel recherchiert live im Web · 5–15 s …
             </div>
           )}
 
@@ -121,7 +121,7 @@ export function ResearchModal({ query, onClose }: ResearchModalProps) {
               </div>
               <div className="mt-1 text-text-secondary">
                 {data.reason === 'unconfigured'
-                  ? 'Hermes (Live-Tier) ist auf der Radar-Seite noch nicht konfiguriert. Sobald HERMES_BASE_URL gesetzt ist, läuft die Sonar-Recherche live.'
+                  ? 'Die RSG Engine ist auf diesem Deployment noch nicht aktiviert. Sobald sie erreichbar ist, läuft die Live-Recherche.'
                   : `Reason: ${data.reason ?? 'unknown'}`}
               </div>
             </div>
@@ -248,8 +248,8 @@ export function ResearchModal({ query, onClose }: ResearchModalProps) {
         </div>
 
         <div className="border-t border-bg-border bg-bg-surface px-5 py-2 font-mono text-2xs uppercase tracking-terminal text-text-muted">
-          {data?.model && <>model · {data.model}</>}
-          {data?.model && <span className="mx-2 text-text-faint">·</span>}
+          {data?.research && <>RSG Live Intel</>}
+          {data?.research && <span className="mx-2 text-text-faint">·</span>}
           <span>esc · close</span>
         </div>
       </div>

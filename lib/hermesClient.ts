@@ -13,16 +13,23 @@
  *   HERMES_TIMEOUT_MS  default 25000
  */
 
+import { getConfig } from './runtimeConfig';
+
 const DEFAULT_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS ?? 25_000);
 
-function baseUrl(): string | null {
-  const raw = process.env.HERMES_BASE_URL?.trim();
+async function baseUrl(): Promise<string | null> {
+  const raw = (await getConfig('HERMES_BASE_URL'))?.trim();
   if (!raw) return null;
   return raw.replace(/\/+$/, '');
 }
 
-export function isHermesConfigured(): boolean {
-  return baseUrl() !== null;
+export async function isHermesConfigured(): Promise<boolean> {
+  return (await baseUrl()) !== null;
+}
+
+/** Sync variant for the /api/health probe — checks env + cached value only. */
+export function isHermesConfiguredSync(): boolean {
+  return Boolean(process.env.HERMES_BASE_URL?.trim());
 }
 
 export interface HermesError {
@@ -53,13 +60,13 @@ interface CallOptions {
 }
 
 async function call<T>(opts: CallOptions): Promise<HermesResult<T>> {
-  const root = baseUrl();
+  const root = await baseUrl();
   if (!root) {
     return {
       ok: false,
       fellBack: true,
       reason: 'unconfigured',
-      detail: 'HERMES_BASE_URL not set',
+      detail: 'engine not configured',
     };
   }
 
@@ -68,7 +75,7 @@ async function call<T>(opts: CallOptions): Promise<HermesResult<T>> {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   };
-  const apiKey = process.env.HERMES_API_KEY?.trim();
+  const apiKey = (await getConfig('HERMES_API_KEY'))?.trim();
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   const ctrl = new AbortController();
@@ -370,4 +377,45 @@ export async function researchCompany(
     body: input,
     timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
   });
+}
+
+/**
+ * Strip vendor-identifying metadata from any Hermes response before
+ * the radar's proxy returns it to the customer-facing dashboard.
+ * Removes `model`, `usage`, `engine` plus any vendor-domain citations.
+ * News citations (handelsblatt.com, tagesschau.de, manager-magazin.de
+ * etc.) are KEPT — those are the value the recruiter needs to verify.
+ */
+const VENDOR_DOMAINS = [
+  'perplexity.ai',
+  'openai.com',
+  'anthropic.com',
+  'openrouter.ai',
+  'sdmx.oecd.org',
+  'stats.oecd.org',
+  'data-api.ecb.europa.eu',
+  'developer.adzuna.com',
+  'api.adzuna.com',
+];
+
+export function stripVendor<T extends Record<string, unknown>>(
+  data: T
+): Omit<T, 'model' | 'usage' | 'engine'> {
+  const clone: Record<string, unknown> = { ...data };
+  delete clone.model;
+  delete clone.usage;
+  delete clone.engine;
+  const cits = clone.citations;
+  if (Array.isArray(cits)) {
+    clone.citations = (cits as unknown[]).filter((u): u is string => {
+      if (typeof u !== 'string') return false;
+      try {
+        const host = new URL(u).host.toLowerCase();
+        return !VENDOR_DOMAINS.some((d) => host.includes(d));
+      } catch {
+        return true;
+      }
+    });
+  }
+  return clone as Omit<T, 'model' | 'usage' | 'engine'>;
 }

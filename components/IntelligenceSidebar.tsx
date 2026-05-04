@@ -274,7 +274,7 @@ export function IntelligenceSidebar({
             </div>
           </div>
           <div className="mt-2 border-t border-bg-border pt-2 font-mono text-2xs uppercase tracking-wider text-text-muted">
-            Codex · PHS v1.0
+            RSG Engine · v1.0
           </div>
         </div>
       </div>

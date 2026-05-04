@@ -18,7 +18,7 @@ export function ForecastPanel({ company }: ForecastPanelProps) {
         <div className="flex items-center gap-3">
           <span className="label-eyebrow">Forecast · Predicted Role Clusters</span>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            from /api/company/[id] · Codex engine
+            RSG Engine · forecast band · role clusters
           </span>
         </div>
         <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
@@ -111,7 +111,7 @@ function ForecastContent({ company }: { company: CompanyView }) {
         <div className="flex items-center justify-between">
           <div className="label-eyebrow">Predicted Role Clusters</div>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            from latestPrediction.expectedRoleClusters
+            RSG Engine · predicted
           </span>
         </div>
 
@@ -229,7 +229,7 @@ function ForwardForecast({ forecast }: { forecast: CompanyForecast | null }) {
         <div className="flex items-center gap-2">
           <div className="label-eyebrow">Forward Forecast · 30 / 60 / 90 / 180 d</div>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            from /api/forecast/company/[id]
+            RSG Engine · forward forecast
           </span>
         </div>
         <span className={`chip ${posture.fg} ${posture.ring} ${posture.bg}`}>

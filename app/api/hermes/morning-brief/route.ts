@@ -4,6 +4,7 @@ import {
   isHermesConfigured,
   type MorningBriefInput,
 } from '../../../../lib/hermesClient';
+import { stripVendor } from '../../../../lib/hermesClient';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: 'invalid_json' }, { status: 400 });
   }
 
-  if (!isHermesConfigured()) {
+  if (!(await isHermesConfigured())) {
     return Response.json(
       {
         ok: false,
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
   return Response.json({
     ok: true,
-    ...r.data,
+    ...stripVendor(r.data as unknown as Record<string, unknown>),
     generatedAt: new Date().toISOString(),
   });
 }

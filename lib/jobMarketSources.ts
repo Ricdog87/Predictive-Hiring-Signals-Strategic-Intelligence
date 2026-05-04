@@ -12,20 +12,29 @@
  * dashboard never blanks.
  */
 
+import { getConfig } from './runtimeConfig';
+
 const TIMEOUT_MS = Number(process.env.ADZUNA_TIMEOUT_MS ?? 8_000);
 const REVALIDATE_SECONDS = Number(process.env.ADZUNA_REVALIDATE_SECONDS ?? 1_800); // 30m
 
 const COUNTRY = 'de';
 
-function appCreds(): { id: string; key: string } | null {
-  const id = process.env.ADZUNA_APP_ID?.trim();
-  const key = process.env.ADZUNA_APP_KEY?.trim();
+async function appCreds(): Promise<{ id: string; key: string } | null> {
+  const id = (await getConfig('ADZUNA_APP_ID'))?.trim();
+  const key = (await getConfig('ADZUNA_APP_KEY'))?.trim();
   if (!id || !key) return null;
   return { id, key };
 }
 
-export function isAdzunaConfigured(): boolean {
-  return appCreds() !== null;
+export async function isAdzunaConfigured(): Promise<boolean> {
+  return (await appCreds()) !== null;
+}
+
+/** Sync probe — env-only, used by /api/health for the fast path. */
+export function isAdzunaConfiguredSync(): boolean {
+  return Boolean(
+    process.env.ADZUNA_APP_ID?.trim() && process.env.ADZUNA_APP_KEY?.trim()
+  );
 }
 
 /**
@@ -80,7 +89,7 @@ export interface AdzunaError {
 async function adzunaFetch<T>(
   path: string
 ): Promise<{ ok: true; data: T } | AdzunaError> {
-  const creds = appCreds();
+  const creds = await appCreds();
   if (!creds) {
     return { ok: false, reason: 'unconfigured', detail: 'ADZUNA_APP_ID / ADZUNA_APP_KEY not set' };
   }
@@ -185,7 +194,7 @@ export interface AdzunaPulse {
 export async function fetchAdzunaPulse(): Promise<
   { ok: true; data: AdzunaPulse } | AdzunaError
 > {
-  const creds = appCreds();
+  const creds = await appCreds();
   if (!creds) {
     return { ok: false, reason: 'unconfigured' };
   }

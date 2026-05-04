@@ -80,13 +80,13 @@ export function JobMarketPanel() {
     <div className="panel">
       <div className="panel-header">
         <div className="flex items-center gap-3">
-          <span className="label-eyebrow">DE Job Market · Adzuna Pulse</span>
+          <span className="label-eyebrow">DE Job Market · RSG Pulse</span>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
             {data?.ok ? `${fmt(data.totalPostings ?? 0)} offene Stellen · 12 Kategorien` : 'live · DE'}
           </span>
         </div>
         <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
-          GET /api/jobmarket/pulse
+          live · refresh 30 min
         </span>
       </div>
 
@@ -106,20 +106,10 @@ export function JobMarketPanel() {
         <div className="px-5 py-5">
           <div className="rounded-sm border border-dashed border-bg-line bg-bg-surface/40 p-4 text-[12.5px] text-text-secondary">
             <div className="font-semibold text-text-primary">
-              Adzuna ist auf der Radar-Seite (noch) nicht konfiguriert.
+              RSG Job Market ist auf diesem Deployment noch nicht konfiguriert.
             </div>
             <div className="mt-1 text-text-muted">
-              Setze <code className="font-mono text-accent-cyan">ADZUNA_APP_ID</code> +{' '}
-              <code className="font-mono text-accent-cyan">ADZUNA_APP_KEY</code> auf Vercel — kostenlos via{' '}
-              <a
-                href="https://developer.adzuna.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent-cyan hover:underline"
-              >
-                developer.adzuna.com
-              </a>
-              . Anschließend zeigt diese Section live: Stellenanzeigen-Volumen pro Kategorie, Median-Gehalt, Top-Arbeitgeber.
+              Im Admin-Bereich (<a href="/admin/settings" className="text-accent-cyan hover:underline">Settings</a>) die Job-Market-Credentials hinterlegen — danach zeigt diese Section live: Stellenanzeigen-Volumen pro Kategorie, Median-Gehalt, Top-Arbeitgeber.
             </div>
           </div>
         </div>
@@ -190,7 +180,7 @@ export function JobMarketPanel() {
               )}
             </ul>
             <div className="mt-3 border-t border-bg-border pt-2 font-mono text-2xs uppercase tracking-wider text-text-muted">
-              Quelle · Adzuna DE · refresh 30 min
+              RSG Job Market · refresh 30 min
             </div>
           </div>
         </div>

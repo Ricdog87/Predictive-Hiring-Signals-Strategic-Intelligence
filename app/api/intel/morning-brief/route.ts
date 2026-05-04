@@ -4,6 +4,7 @@ import {
   isHermesConfigured,
   type MorningBriefInput,
 } from '../../../../lib/hermesClient';
+import { stripVendor } from '../../../../lib/hermesClient';
 
 export const runtime = 'nodejs';
 // Edge-cache the brief for 4 hours. One Sonar call serves every
@@ -20,7 +21,7 @@ export const revalidate = 14_400;
  * caller whether the brief is real or a deterministic fallback.
  */
 export async function GET(req: NextRequest) {
-  if (!isHermesConfigured()) {
+  if (!(await isHermesConfigured())) {
     return Response.json(
       {
         ok: false,
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     ok: true,
-    ...r.data,
+    ...stripVendor(r.data as unknown as Record<string, unknown>),
     generatedAt: new Date().toISOString(),
   });
 }

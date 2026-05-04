@@ -1,8 +1,8 @@
 import { ingestStoreTier } from '../../../lib/ingestStore';
 import { pingSupabase, isSupabaseConfigured } from '../../../lib/supabaseStore';
-import { isHermesConfigured, hermesHealth } from '../../../lib/hermesClient';
+import { isHermesConfiguredSync as isHermesConfigured, hermesHealth } from '../../../lib/hermesClient';
 import { isMirofishConfigured } from '../../../lib/mirofishClient';
-import { isAdzunaConfigured } from '../../../lib/jobMarketSources';
+import { isAdzunaConfiguredSync as isAdzunaConfigured } from '../../../lib/jobMarketSources';
 import { isAuthEnforced as isApiKeyAuthEnforced, listConfiguredKeyIds } from '../../../lib/apiKeys';
 import { fetchDEUnemployment } from '../../../lib/macro';
 import { fetchECBRate } from '../../../lib/macroSources';

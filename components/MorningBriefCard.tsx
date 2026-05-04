@@ -112,7 +112,7 @@ export function MorningBriefCard({ watchlistCompanies = [] }: MorningBriefCardPr
   if (!data && !error) {
     return (
       <section className="border-b border-bg-border bg-bg-surface px-5 py-4 font-mono text-2xs uppercase tracking-terminal text-text-muted">
-        ▸ briefing wird recherchiert · sonar (perplexity) live web …
+        ▸ Morning Brief wird recherchiert · RSG Live Intel …
       </section>
     );
   }
@@ -126,8 +126,8 @@ export function MorningBriefCard({ watchlistCompanies = [] }: MorningBriefCardPr
           <span className="text-text-faint">·</span>
           <span className="text-text-secondary">
             {data.reason === 'unconfigured'
-              ? 'aktiviert sich sobald Hermes erreichbar ist'
-              : `live tier · ${data.reason ?? 'unavailable'}`}
+              ? 'aktiviert sich sobald die RSG Engine erreichbar ist'
+              : `RSG Intel · ${data.reason ?? 'unavailable'}`}
           </span>
         </div>
       </section>
@@ -159,7 +159,7 @@ export function MorningBriefCard({ watchlistCompanies = [] }: MorningBriefCardPr
           </span>
         </span>
         <span className="font-mono text-2xs uppercase tracking-terminal text-text-muted">
-          {data?.model?.replace(/^[^/]+\//, '') ?? 'sonar'}
+          RSG Live Intel
           {data?.generatedAt && ` · ${relTime(data.generatedAt)}`}
         </span>
         <span className="ml-auto flex items-center gap-2">

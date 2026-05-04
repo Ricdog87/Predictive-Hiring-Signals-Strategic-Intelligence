@@ -20,8 +20,6 @@
 
 import type { NextRequest } from 'next/server';
 
-const DEFAULT_QUOTA = Number(process.env.EXTERNAL_API_DEFAULT_QUOTA ?? 60);
-
 interface KeyConfig {
   key: string;
   quotaPerHour: number;
@@ -32,8 +30,12 @@ interface KeyState {
   resetsAt: number;
 }
 
-const KEYS: Map<string, KeyConfig> = (() => {
-  const raw = process.env.EXTERNAL_API_KEYS?.trim();
+/**
+ * Parse the `EXTERNAL_API_KEYS` value (comma-separated `key:quota`)
+ * into a Map. Live re-read every call so the admin panel can rotate
+ * keys without a redeploy. Cheap — string parsing only.
+ */
+function parseKeys(raw: string | undefined, defaultQuota: number): Map<string, KeyConfig> {
   const m = new Map<string, KeyConfig>();
   if (!raw) return m;
   for (const entry of raw.split(',')) {
@@ -44,11 +46,47 @@ const KEYS: Map<string, KeyConfig> = (() => {
     const q = Number(quotaRaw);
     m.set(key, {
       key,
-      quotaPerHour: Number.isFinite(q) && q > 0 ? q : DEFAULT_QUOTA,
+      quotaPerHour: Number.isFinite(q) && q > 0 ? q : defaultQuota,
     });
   }
   return m;
-})();
+}
+
+/** Last-known config — refreshed lazily by `getKeys()`. */
+let cachedKeys: Map<string, KeyConfig> = new Map();
+let cachedKeysAt = 0;
+const KEYS_TTL_MS = 60_000;
+
+async function getKeys(): Promise<Map<string, KeyConfig>> {
+  const now = Date.now();
+  if (now - cachedKeysAt < KEYS_TTL_MS) return cachedKeys;
+  // Lazy-import runtimeConfig to avoid a cycle. Falls back to env.
+  const { getConfig } = await import('./runtimeConfig');
+  const raw =
+    (await getConfig('EXTERNAL_API_KEYS'))?.trim() ||
+    process.env.EXTERNAL_API_KEYS?.trim();
+  const dq = Number(
+    (await getConfig('EXTERNAL_API_DEFAULT_QUOTA'))?.trim() ||
+      process.env.EXTERNAL_API_DEFAULT_QUOTA ||
+      60
+  );
+  cachedKeys = parseKeys(raw, Number.isFinite(dq) && dq > 0 ? dq : 60);
+  cachedKeysAt = now;
+  return cachedKeys;
+}
+
+/** Synchronous best-effort — used in hot paths that can't await. Reads
+ *  env directly + the warm in-memory cache. */
+function getKeysSync(): Map<string, KeyConfig> {
+  if (Date.now() - cachedKeysAt < KEYS_TTL_MS) return cachedKeys;
+  const dq = Number(process.env.EXTERNAL_API_DEFAULT_QUOTA ?? 60);
+  cachedKeys = parseKeys(
+    process.env.EXTERNAL_API_KEYS?.trim(),
+    Number.isFinite(dq) && dq > 0 ? dq : 60
+  );
+  cachedKeysAt = Date.now();
+  return cachedKeys;
+}
 
 const state = new Map<string, KeyState>();
 
@@ -84,6 +122,7 @@ export interface AuthResult {
  * the caller can log it.
  */
 export function checkApiKey(req: NextRequest | Request): AuthResult {
+  const KEYS = getKeysSync();
   // Soft mode — no keys configured means the surface is open.
   if (KEYS.size === 0) {
     return {
@@ -168,10 +207,17 @@ export function denyResponseFor(auth: AuthResult): Response | null {
   );
 }
 
+/** Force-refresh the API key cache. Call from a route's `await` line
+ *  before checkApiKey so post-admin-edit changes propagate. */
+export async function refreshKeys(): Promise<void> {
+  cachedKeysAt = 0;
+  await getKeys();
+}
+
 export function isAuthEnforced(): boolean {
-  return KEYS.size > 0;
+  return getKeysSync().size > 0;
 }
 
 export function listConfiguredKeyIds(): string[] {
-  return Array.from(KEYS.keys());
+  return Array.from(getKeysSync().keys());
 }

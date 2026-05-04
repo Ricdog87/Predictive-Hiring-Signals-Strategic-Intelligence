@@ -208,8 +208,8 @@ function UnemploymentStat() {
   const value =
     snap?.ok && typeof snap.rate === 'number' ? `${snap.rate.toFixed(1)}%` : '—';
   const sub = snap?.ok && snap.period
-    ? `🇩🇪 unemployment · ${snap.period} · Eurostat`
-    : 'Eurostat · monthly';
+    ? `🇩🇪 unemployment · ${snap.period}`
+    : 'RSG Macro · monthly';
   return <Stat label="DE Arbeitslosenquote" value={value} sub={sub} tone="cyan" />;
 }
 

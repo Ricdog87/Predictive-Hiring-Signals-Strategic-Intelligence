@@ -123,7 +123,7 @@ export function MacroStrip() {
           decimals={1}
           period={state.inflation?.period}
           tone="amber"
-          source="ECB SDW · jährlich"
+          source="RSG Macro · monetary policy"
         />
         <Tile
           label="DE Arbeitslosenquote"
@@ -132,7 +132,7 @@ export function MacroStrip() {
           decimals={1}
           period={state.unemployment?.period}
           tone="cyan"
-          source="Eurostat · monatlich SA"
+          source="RSG Macro · monthly · seasonally adjusted"
         />
         <Tile
           label="DE Beschäftigungsquote"
@@ -141,7 +141,7 @@ export function MacroStrip() {
           decimals={1}
           period={state.employment?.period}
           tone="green"
-          source="Eurostat · 15-64 SA"
+          source="RSG Macro · 15–64 · seasonally adjusted"
         />
         <Tile
           label="DE Industrieklima"
@@ -155,7 +155,7 @@ export function MacroStrip() {
               ? 'red'
               : 'amber'
           }
-          source="Eurostat · ei_bssi_m_r2 · Industrial Confidence (SA)"
+          source="RSG Macro · industrial confidence balance"
         />
         <Tile
           label="DE Sentiment · ESI"
@@ -171,8 +171,8 @@ export function MacroStrip() {
           }
           source={
             state.cli?.trend
-              ? `Eurostat · Economic Sentiment · ${state.cli.trend}`
-              : 'Eurostat · ei_bssi_m_r2 · BS-ESI-I'
+              ? `RSG Macro · Economic Sentiment · ${state.cli.trend}`
+              : 'RSG Macro · economic sentiment indicator'
           }
         />
       </div>

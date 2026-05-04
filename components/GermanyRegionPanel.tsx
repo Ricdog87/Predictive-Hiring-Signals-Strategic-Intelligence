@@ -184,7 +184,7 @@ export function GermanyRegionPanel() {
         </div>
         <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-wider text-text-muted">
           {data?.macro?.indicator && (
-            <span>Eurostat overlay · {data.macro.available} Länder</span>
+            <span>Macro overlay · {data.macro.available} Länder</span>
           )}
           {error && <span className="text-accent-red">api · {error}</span>}
         </div>
@@ -306,7 +306,7 @@ function QuadrantTile({
               onInsight();
             }}
             className="rounded-sm border border-bg-border bg-bg-elevated px-1.5 py-0.5 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:border-accent-violet/40 hover:text-accent-violet"
-            title="Hermes · Live insight"
+            title="RSG Live Intel · region insight"
           >
             ✦ AI
           </button>
@@ -416,7 +416,7 @@ function LandTile({
         <span>{b.companyCount}c</span>
         <span>{b.signalCount}s</span>
         {b.unemploymentRate != null && (
-          <span title={`Eurostat ${b.unemploymentPeriod}`}>
+          <span title={`Unemployment · ${b.unemploymentPeriod ?? ''}`}>
             {b.unemploymentRate.toFixed(1)}%
           </span>
         )}
@@ -476,7 +476,7 @@ function LandDetail({
               ? `${land.unemploymentRate.toFixed(1)}%`
               : "—"
           }
-          sub={land.unemploymentPeriod ?? "Eurostat"}
+          sub={land.unemploymentPeriod ?? "live macro"}
         />
       </div>
 
@@ -518,12 +518,12 @@ function LandDetail({
           <div className="label-eyebrow mb-1 flex items-center gap-2">
             <span>Live insight</span>
             <span className="text-text-faint">·</span>
-            <span className="text-accent-violet">Hermes / Sonar</span>
+            <span className="text-accent-violet">RSG Live Intel</span>
           </div>
           <InsightCard
             insight={insight}
             loading={insightLoading}
-            placeholder={`Klick "Live AI insight" oben — Sonar (Perplexity via Hermes) holt aktuelle Quellen für ${land.name}.`}
+            placeholder={`Klick "Live AI insight" oben — RSG Live Intel holt aktuelle Quellen für ${land.name}.`}
           />
         </div>
       </div>
@@ -543,7 +543,7 @@ function InsightCard({
   if (loading) {
     return (
       <div className="rounded-sm border border-bg-border bg-bg-panel p-3 font-mono text-2xs uppercase tracking-terminal text-text-muted">
-        ▸ querying live web · perplexity sonar…
+        ▸ querying live web · RSG Live Intel…
       </div>
     );
   }
@@ -558,7 +558,7 @@ function InsightCard({
     return (
       <div className="rounded-sm border border-accent-amber/40 bg-accent-amber/[0.06] p-3 text-[12.5px] text-accent-amber">
         {insight.reason === "unconfigured"
-          ? "Hermes ist auf der Radar-Seite nicht konfiguriert (HERMES_BASE_URL fehlt). Sonar-Insights werden verfügbar, sobald Hermes erreichbar ist."
+          ? "Die RSG Engine ist auf diesem Deployment noch nicht aktiviert. Live-Insights werden verfügbar, sobald die Engine erreichbar ist."
           : `live insight unavailable · ${insight.reason ?? "unknown"}`}
       </div>
     );

@@ -184,14 +184,14 @@ export function CommandPalette({
 
     // Always append a "Research live · <q>" item when the user has typed
     // at least 3 characters and the radar has a research callback. This
-    // is the search-field-for-any-company escape hatch — Sonar (live web)
+    // is the search-field-for-any-company escape hatch — RSG Live Intel
     // researches any firm, not just the ones in the master.
     if (onResearchCompany && trimmed.length >= 3) {
       base.push({
         kind: 'research',
         id: `research:${trimmed}`,
         label: `Research live · "${trimmed}"`,
-        detail: 'Live web search via Sonar — works for any company, not just the master',
+        detail: 'RSG Live Intel · works for any company, not just the master',
         glyph: '✦',
         invoke: () => onResearchCompany(trimmed),
         rank: 1000,

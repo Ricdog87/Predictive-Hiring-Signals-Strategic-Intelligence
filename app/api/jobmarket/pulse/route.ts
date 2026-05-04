@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 export const revalidate = 1_800;
 
 export async function GET() {
-  if (!isAdzunaConfigured()) {
+  if (!(await isAdzunaConfigured())) {
     return Response.json({
       ok: false,
       configured: false,
