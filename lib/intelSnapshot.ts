@@ -29,6 +29,7 @@ import { fetchAllNews } from './newsFetcher';
 import { classifyNewsBatch } from './newsClassifier';
 import { fetchAdzunaPulse } from './jobMarketSources';
 import { computeOpportunities } from './opportunityEngine';
+import { computeForecasts, summariseForecasts, type CompanyForecast, type ForecastSummary } from './hiringForecast';
 import { listIngest } from './ingestStore';
 import { computeMarketOverview, computeSectorTrends } from '../src/market/engine';
 
@@ -113,6 +114,12 @@ export interface IntelSnapshot {
     topCompaniesAcross?: Array<{ name: string; postings: number }>;
     reason?: string;
   };
+  /** Forward-looking forecast — who's about to hire, what role, when. */
+  forecast: {
+    summary: ForecastSummary;
+    /** Top forecast-ranked companies, with role-family probabilities. */
+    topCompanies: CompanyForecast[];
+  };
 }
 
 function settledOk<T>(
@@ -157,6 +164,11 @@ export async function buildIntelSnapshot(
     { aggregates, liveRecords },
     { limit: topN }
   );
+
+  // Forward-looking layer: compute hiring forecasts in the same hot
+  // path. Pure CPU work — no network — so we don't need allSettled.
+  const forecasts = computeForecasts(aggregates, { limit: topN });
+  const forecastSummary = summariseForecasts(forecasts);
 
   // Wrap fetchAllNews so it conforms to the `{ok,data}` shape the
   // settledOk helper expects.
@@ -317,5 +329,9 @@ export async function buildIntelSnapshot(
     })),
     breakingNews,
     jobMarket,
+    forecast: {
+      summary: forecastSummary,
+      topCompanies: forecasts,
+    },
   };
 }
