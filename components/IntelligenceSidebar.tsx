@@ -1,8 +1,13 @@
 "use client";
 
 import { DATA_SOURCES, PRIMARY_NAV } from "@/lib/uiMockData";
+import type { SessionUser } from "@/lib/session";
 
-export function IntelligenceSidebar() {
+interface IntelligenceSidebarProps {
+  user?: SessionUser;
+}
+
+export function IntelligenceSidebar({ user }: IntelligenceSidebarProps = {}) {
   return (
     <aside className="hidden lg:flex w-[236px] shrink-0 flex-col border-r border-bg-border bg-bg-surface">
       <div className="flex h-12 items-center gap-2.5 border-b border-bg-border px-4">
@@ -19,6 +24,25 @@ export function IntelligenceSidebar() {
           <div className="label-eyebrow">Intelligence Terminal</div>
         </div>
       </div>
+
+      {user && (
+        <div className="border-b border-bg-border px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-accent-cyan/10 font-mono text-2xs font-semibold text-accent-cyan ring-1 ring-accent-cyan/30">
+              {user.initials}
+            </span>
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-[12px] font-medium text-text-primary">
+                {user.fullName}
+              </div>
+              <div className="label-eyebrow flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-accent-green animate-pulse-soft" />
+                <span className="truncate">online</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         <SectionHeader label="Workspace" />

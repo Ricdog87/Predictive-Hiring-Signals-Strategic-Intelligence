@@ -13,23 +13,23 @@ interface SignalTimelineProps {
 }
 
 const CATEGORY_COLOR: Record<HiringSignalType, string> = {
-  job_spike: "#22D3EE",
-  employee_growth: "#34D399",
-  funding_grant: "#A78BFA",
-  location_expansion: "#7DD3FC",
-  new_business_unit: "#22D3EE",
-  product_launch: "#34D399",
-  patent_filing: "#7DD3FC",
-  gf_change: "#FBBF24",
-  press_release: "#9AA3B2",
-  mna_buy: "#A78BFA",
-  mna_sell: "#FB7185",
-  restructuring: "#FB7185",
-  insolvency: "#F87171",
+  job_spike: "#0E6B85",
+  employee_growth: "#3A8841",
+  funding_grant: "#6D4FC4",
+  location_expansion: "#1F7E96",
+  new_business_unit: "#0E6B85",
+  product_launch: "#3A8841",
+  patent_filing: "#1F7E96",
+  gf_change: "#B07C12",
+  press_release: "#8E867A",
+  mna_buy: "#6D4FC4",
+  mna_sell: "#C84F60",
+  restructuring: "#C84F60",
+  insolvency: "#BE3C3C",
 };
 
 const colorOf = (t: string): string =>
-  (t in CATEGORY_COLOR ? CATEGORY_COLOR[t as HiringSignalType] : "#9AA3B2");
+  (t in CATEGORY_COLOR ? CATEGORY_COLOR[t as HiringSignalType] : "#8E867A");
 
 const DAYS = 90;
 
@@ -118,7 +118,7 @@ export function SignalTimeline({ companies }: SignalTimelineProps) {
                     x2={DAYS + 1}
                     y1={g}
                     y2={g}
-                    stroke="#1B2030"
+                    stroke="#D8CDB5"
                     strokeWidth="0.4"
                   />
                 ))}
@@ -132,7 +132,7 @@ export function SignalTimeline({ companies }: SignalTimelineProps) {
                         y={100 - h}
                         width={0.7}
                         height={h}
-                        fill={b.total > 0 ? "#22D3EE" : "transparent"}
+                        fill={b.total > 0 ? "#0E6B85" : "transparent"}
                         opacity={0.65}
                       />
                       {negH > 0 && (
@@ -141,7 +141,7 @@ export function SignalTimeline({ companies }: SignalTimelineProps) {
                           y={100 - negH}
                           width={0.7}
                           height={negH}
-                          fill="#F87171"
+                          fill="#BE3C3C"
                           opacity={0.85}
                         />
                       )}

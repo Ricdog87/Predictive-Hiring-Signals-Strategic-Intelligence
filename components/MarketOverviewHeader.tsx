@@ -1,13 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { MarketOverview } from "@/lib/uiContracts/market";
 import {
   TEMPERATURE_STYLES,
   temperatureForScore,
 } from "@/lib/marketIntelligence";
+import type { SessionUser } from "@/lib/session";
 
 interface MarketOverviewHeaderProps {
   overview: MarketOverview;
+  user: SessionUser;
 }
 
 /**
@@ -15,9 +18,13 @@ interface MarketOverviewHeaderProps {
  * fields exposed by GET /api/market-overview rendered as a 7-up density
  * strip. Designed to be glanceable in <2 seconds.
  */
-export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
+export function MarketOverviewHeader({
+  overview,
+  user,
+}: MarketOverviewHeaderProps) {
   const temp = temperatureForScore(overview.averageHiringScore);
   const t = TEMPERATURE_STYLES[temp];
+  const { time, tz } = useLocalClock();
   return (
     <header className="sticky top-0 z-30 border-b border-bg-border bg-bg-base/90 backdrop-blur">
       <div className="flex h-12 items-center justify-between border-b border-bg-line/60 px-5">
@@ -37,7 +44,7 @@ export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <Meta label="UTC" value={utcNow()} />
+          <Meta label={tz} value={time} />
           <Meta label="Market" value="DE · DACH" tone="cyan" />
           <Meta label="Engine" value="Codex · MI v1.0" />
           <Meta
@@ -48,8 +55,21 @@ export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
           <button className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">
             ⌘K · Search
           </button>
-          <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-bg-border bg-bg-panel font-mono text-2xs text-text-secondary">
-            RD
+          <div
+            className="flex h-7 items-center gap-2 rounded-sm border border-bg-border bg-bg-panel pl-2 pr-2.5"
+            title={`${user.fullName} · ${user.role}`}
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-sm bg-accent-cyan/15 font-mono text-2xs font-semibold text-accent-cyan">
+              {user.initials}
+            </span>
+            <span className="hidden md:flex flex-col leading-none">
+              <span className="font-mono text-[11px] text-text-primary">
+                {user.fullName}
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-terminal text-text-muted">
+                {user.role}
+              </span>
+            </span>
           </div>
         </div>
       </div>
@@ -105,12 +125,33 @@ export function MarketOverviewHeader({ overview }: MarketOverviewHeaderProps) {
   );
 }
 
-function utcNow() {
-  const d = new Date();
-  return `${d.getUTCHours().toString().padStart(2, "0")}:${d
-    .getUTCMinutes()
-    .toString()
-    .padStart(2, "0")}`;
+function useLocalClock(): { time: string; tz: string } {
+  const [time, setTime] = useState("--:--:--");
+  const [tz, setTz] = useState("LOCAL");
+  useEffect(() => {
+    try {
+      const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const city = resolved?.split("/").pop()?.replace(/_/g, " ") ?? "LOCAL";
+      setTz(city);
+    } catch {
+      setTz("LOCAL");
+    }
+    const tick = () => {
+      const d = new Date();
+      setTime(
+        new Intl.DateTimeFormat("de-DE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }).format(d)
+      );
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
+  return { time, tz };
 }
 
 function Meta({
