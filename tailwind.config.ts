@@ -80,6 +80,12 @@ const config: Config = {
       animation: {
         "pulse-soft": "pulseSoft 2.4s ease-in-out infinite",
         ticker: "ticker 60s linear infinite",
+        "slide-down": "slideDown 600ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-in": "fadeIn 600ms ease-out both",
+        "fade-in-up": "fadeInUp 700ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "boot-fill": "bootFill 1400ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "scan-sweep": "scanSweep 2.6s ease-in-out infinite",
+        "cursor-blink": "cursorBlink 1.05s steps(2, end) infinite",
       },
       keyframes: {
         pulseSoft: {
@@ -89,6 +95,31 @@ const config: Config = {
         ticker: {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
+        },
+        slideDown: {
+          "0%": { transform: "translateY(-12px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        fadeInUp: {
+          "0%": { transform: "translateY(8px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        bootFill: {
+          "0%": { width: "0%" },
+          "100%": { width: "100%" },
+        },
+        scanSweep: {
+          "0%": { transform: "translateX(-100%)", opacity: "0" },
+          "20%": { opacity: "0.6" },
+          "100%": { transform: "translateX(220%)", opacity: "0" },
+        },
+        cursorBlink: {
+          "0%, 100%": { opacity: "0" },
+          "50%": { opacity: "1" },
         },
       },
     },
