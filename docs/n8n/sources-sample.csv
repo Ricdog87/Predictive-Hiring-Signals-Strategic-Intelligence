@@ -1,0 +1,9 @@
+active,company_name,company_domain,source_type,rss_url,newsroom_url,country,region,industry,priority
+true,SAP SE,sap.com,newsroom_rss,https://news.sap.com/feed/,https://news.sap.com/,DE,DACH · South,Enterprise Software,1
+true,Siemens AG,siemens.com,press_rss,https://press.siemens.com/global/en/rss.xml,https://press.siemens.com/global/en,DE,DACH · South,Industrial AI,1
+true,Bosch GmbH,bosch.com,press_rss,https://www.bosch-presse.de/pressportal/de/de/feed.rss,https://www.bosch-presse.de/pressportal/de/de/,DE,DACH · South,Mobility & Automotive,1
+true,Volkswagen AG,volkswagen-newsroom.com,newsroom_rss,https://www.volkswagen-newsroom.com/en/rss-feed-1612,https://www.volkswagen-newsroom.com/en,DE,DACH · North,Mobility & Automotive,2
+true,Deutsche Bank AG,db.com,press_rss,https://www.db.com/news/rss-feed.xml,https://www.db.com/news,DE,DACH · North,Financial Services,2
+true,BASF SE,basf.com,press_rss,https://www.basf.com/global/en/news/rss-feeds.html,https://www.basf.com/global/en/media,DE,DACH · West,Chemicals & Energy,2
+true,Deutsche Telekom AG,telekom.com,press_rss,https://www.telekom.com/resource/blob/rss/de/medien.xml,https://www.telekom.com/de/medien,DE,DACH · West,Telecom & Cloud,2
+true,Allianz SE,allianz.com,press_rss,https://www.allianz.com/en/press.xml,https://www.allianz.com/en/press.html,DE,DACH · South,Financial Services,3
