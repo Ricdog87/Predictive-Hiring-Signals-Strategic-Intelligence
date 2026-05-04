@@ -1,0 +1,352 @@
+{
+  "name": "RSG Hiring Signals Live Ingest v1",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-cron",
+      "name": "Cron · 06:00 CET daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [220, 320]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "RUN_ID",
+              "value": "={{ $now.toISO() }}"
+            },
+            {
+              "name": "RUN_AT_CET",
+              "value": "={{ $now.setZone('Europe/Berlin').toFormat('yyyy-LL-dd HH:mm') }}"
+            },
+            {
+              "name": "INGEST_URL",
+              "value": "={{$env.HIRING_RADAR_INGEST_URL || 'https://predictive-hiring-signals-strategic.vercel.app/api/ingest'}}"
+            },
+            {
+              "name": "INGEST_TOKEN",
+              "value": "={{$env.HIRING_RADAR_INGEST_TOKEN || ''}}"
+            },
+            {
+              "name": "TELEGRAM_CHAT_ID",
+              "value": "={{$env.TELEGRAM_CHAT_ID || ''}}"
+            },
+            {
+              "name": "WORKFLOW_NAME",
+              "value": "rsg-hiring-signals-live-v1"
+            },
+            {
+              "name": "GS_SHEET_ID",
+              "value": "={{$env.RSG_SOURCES_SHEET_ID || ''}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-globals",
+      "name": "Set · Run Globals",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 320]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "={{ $json.GS_SHEET_ID }}",
+        "sheetName": "Sources",
+        "options": {}
+      },
+      "id": "node-sheet-read",
+      "name": "Google Sheets · Read Sources",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [720, 320],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GS_CREDENTIAL_ID",
+          "name": "Google Sheets · RSG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.active }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-filter-active",
+      "name": "Filter · active=true",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [940, 320]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "node-loop",
+      "name": "Loop Over Sources",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1160, 320]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.rss_url || $json.newsroom_url }}",
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "node-fetch-feed",
+      "name": "HTTP · Fetch RSS / Newsroom",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 260],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse RSS / Atom feed and emit one item per article.\n// Pure-JS — no external libs (n8n Code node restriction).\n\nconst src = $input.first().json;\nconst body = src.body || src.data || '';\nconst sourceMeta = $('Loop Over Sources').first().json;\n\nif (!body || typeof body !== 'string') {\n  return [];\n}\n\nfunction stripCdata(s) {\n  return String(s || '')\n    .replace(/<!\\[CDATA\\[(.*?)\\]\\]>/gs, '$1')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction extractTag(block, tag) {\n  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');\n  const m = block.match(re);\n  return m ? stripCdata(m[1]) : '';\n}\n\nfunction extractAttr(block, tag, attr) {\n  const re = new RegExp(`<${tag}[^>]*${attr}=\"([^\"]+)\"`, 'i');\n  const m = block.match(re);\n  return m ? m[1] : '';\n}\n\n// Cut into <item> (RSS) or <entry> (Atom) blocks\nconst itemRe = /<(item|entry)[\\s\\S]*?<\\/(item|entry)>/gi;\nconst blocks = body.match(itemRe) || [];\n\nconst maxAgeDays = 14;\nconst cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;\n\nconst out = [];\nfor (const block of blocks.slice(0, 25)) {\n  const title = extractTag(block, 'title');\n  if (!title) continue;\n\n  let link = extractTag(block, 'link') || extractAttr(block, 'link', 'href');\n  link = (link || '').trim();\n\n  const description =\n    extractTag(block, 'description') ||\n    extractTag(block, 'summary') ||\n    extractTag(block, 'content');\n\n  const pubRaw =\n    extractTag(block, 'pubDate') ||\n    extractTag(block, 'updated') ||\n    extractTag(block, 'published') ||\n    extractTag(block, 'dc:date');\n\n  const observed = pubRaw ? new Date(pubRaw) : new Date();\n  if (Number.isNaN(observed.getTime())) continue;\n  if (observed.getTime() < cutoff) continue;\n\n  out.push({\n    json: {\n      sourceMeta,\n      article: {\n        title,\n        link,\n        description,\n        observedAt: observed.toISOString(),\n      },\n    },\n  });\n}\n\nreturn out;\n"
+      },
+      "id": "node-parse-feed",
+      "name": "Code · Parse Feed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classify the article into a hiring signal type, compute impact and\n// confidence, and assemble the canonical Hiring Radar payload.\n// Tolerates unknown classifications (skips silently).\n\nconst SIGNAL_RULES = [\n  { type: 'insolvency',         re: /insolven[zc]|bankruptcy|chapter\\s*11/i,                   impact: -38, conf: 0.92 },\n  { type: 'restructuring',      re: /restructur|reorgan|umstrukturier|stellenabbau|layoff/i,   impact: -22, conf: 0.78 },\n  { type: 'mna_buy',            re: /acquir(es|ed|ition)|\\b(buys|kauft|übernimmt|takeover)/i,   impact:  24, conf: 0.82 },\n  { type: 'mna_sell',           re: /divest|sells .* (unit|division|business)|verkauft/i,      impact: -14, conf: 0.78 },\n  { type: 'gf_change',          re: /\\bnew (ceo|cto|cfo|coo|chief)|appoint(s|ed)|ernennt/i,    impact:  10, conf: 0.74 },\n  { type: 'patent_filing',      re: /patent (filing|application|granted)|patentanmeldung/i,    impact:  16, conf: 0.78 },\n  { type: 'funding_grant',      re: /raised|series\\s*[a-e]|funding round|förderung|grant/i,    impact:  22, conf: 0.86 },\n  { type: 'location_expansion', re: /opens? .*office|new office|niederlassung|expand|standort/i, impact: 20, conf: 0.80 },\n  { type: 'job_spike',          re: /hiring spree|job(s)? (spike|boom)|stellenanzeigen/i,      impact:  26, conf: 0.78 },\n  { type: 'employee_growth',    re: /headcount|workforce growth|mitarbeiter ?wachstum/i,        impact:  20, conf: 0.74 },\n  { type: 'product_launch',     re: /launch(es|ed)|unveil(s|ed)|stellt vor|markteinführung/i,  impact:  14, conf: 0.72 },\n  { type: 'new_business_unit',  re: /new (division|business unit|geschäftsbereich)/i,          impact:  18, conf: 0.78 },\n];\n\nconst items = [];\nfor (const it of $input.all()) {\n  const sourceMeta = it.json.sourceMeta || {};\n  const article = it.json.article || {};\n  const haystack = `${article.title || ''} ${article.description || ''}`;\n\n  let pick = null;\n  for (const rule of SIGNAL_RULES) {\n    if (rule.re.test(haystack)) { pick = rule; break; }\n  }\n\n  // Press release fallback only if the source explicitly opts in\n  if (!pick) {\n    if (String(sourceMeta.source_type || '').toLowerCase().includes('press')) {\n      pick = { type: 'press_release', impact: 6, conf: 0.55 };\n    } else {\n      continue; // skip un-classifiable rows\n    }\n  }\n\n  // Source-trust modifier (priority 1 = high, 5 = low)\n  const priority = Number(sourceMeta.priority || 3);\n  const trust = Math.max(0.6, Math.min(1, 1 - (priority - 1) * 0.08));\n\n  // Recency modifier\n  const ageDays = Math.max(0, (Date.now() - new Date(article.observedAt).getTime()) / 86400000);\n  const recencyBoost = ageDays <= 1 ? 1.1 : ageDays <= 7 ? 1.0 : 0.9;\n\n  const impact = Math.round(Math.max(-100, Math.min(100, pick.impact * recencyBoost)));\n  const confidence = Math.max(0, Math.min(1, +(pick.conf * trust).toFixed(2)));\n\n  items.push({\n    json: {\n      companyName: sourceMeta.company_name,\n      signalType: pick.type,\n      source: sourceMeta.source_type || 'rss',\n      title: article.title,\n      description: (article.description || '').slice(0, 500),\n      impact,\n      confidence,\n      observedAt: article.observedAt,\n      metadata: {\n        url: article.link,\n        region: sourceMeta.region || '',\n        industry: sourceMeta.industry || '',\n        country: sourceMeta.country || '',\n        company_domain: sourceMeta.company_domain || '',\n        workflow: 'rsg-hiring-signals-live-v1',\n      },\n    },\n  });\n}\n\nreturn items;\n"
+      },
+      "id": "node-classify",
+      "name": "Code · Classify + Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1820, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "// In-run de-dup: same companyName + signalType + observedAt collapses to one.\nconst seen = new Set();\nconst out = [];\nfor (const it of $input.all()) {\n  const k = `${it.json.companyName}|${it.json.signalType}|${it.json.observedAt}|${(it.json.title || '').slice(0,80)}`;\n  if (seen.has(k)) continue;\n  seen.add(k);\n  out.push(it);\n}\nreturn out;\n"
+      },
+      "id": "node-dedup",
+      "name": "Code · De-duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2040, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set · Run Globals').first().json.INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set · Run Globals').first().json.INGEST_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "node-post-radar",
+      "name": "HTTP · POST /api/ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2260, 260],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build one IngestLog row per ingested article (success or error).\nconst rows = [];\nfor (const it of $input.all()) {\n  const payload = it.json.body ? it.json.body : {};\n  const reqJson = $('Code · De-duplicate').all()[$itemIndex]?.json || {};\n  const status = it.json.statusCode ?? it.json.status ?? null;\n  const ok = status && status >= 200 && status < 300;\n  rows.push({\n    json: {\n      run_at: new Date().toISOString(),\n      company_name: reqJson.companyName || '',\n      signal_type: reqJson.signalType || '',\n      title: reqJson.title || '',\n      url: (reqJson.metadata && reqJson.metadata.url) || '',\n      impact: reqJson.impact ?? '',\n      confidence: reqJson.confidence ?? '',\n      status: ok ? 'ok' : 'error',\n      response_code: status ?? '',\n      error: ok ? '' : JSON.stringify(payload).slice(0, 300),\n    },\n  });\n}\nreturn rows;\n"
+      },
+      "id": "node-build-log",
+      "name": "Code · Build Log Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2480, 260]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "={{ $('Set · Run Globals').first().json.GS_SHEET_ID }}",
+        "sheetName": "IngestLog",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "node-sheet-log",
+      "name": "Google Sheets · Append IngestLog",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2700, 260],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GS_CREDENTIAL_ID",
+          "name": "Google Sheets · RSG"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate the run into a single Telegram summary message.\nconst all = $('Code · Build Log Rows').all().map((r) => r.json);\nconst total = all.length;\nconst ok = all.filter((r) => r.status === 'ok').length;\nconst errors = total - ok;\nconst byType = all.reduce((acc, r) => {\n  if (r.status !== 'ok') return acc;\n  acc[r.signal_type] = (acc[r.signal_type] || 0) + 1;\n  return acc;\n}, {});\nconst topSignals = Object.entries(byType)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 6)\n  .map(([k, v]) => `• ${k}: ${v}`)\n  .join('\\n');\nconst when = $('Set · Run Globals').first().json.RUN_AT_CET;\nconst lines = [\n  `*RSG Hiring Signals · Daily Ingest*`,\n  `_${when} CET_`,\n  ``,\n  `Ingested: *${ok}/${total}* signals  (errors: ${errors})`,\n  topSignals ? `\\n${topSignals}` : '',\n].filter(Boolean);\nreturn [{ json: { text: lines.join('\\n') } }];\n"
+      },
+      "id": "node-summary",
+      "name": "Code · Build Telegram Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2480, 460]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Set · Run Globals').first().json.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "disable_notification": false
+        }
+      },
+      "id": "node-telegram",
+      "name": "Telegram · Daily Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2700, 460],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram · RSG Bot"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Cron · 06:00 CET daily": {
+      "main": [[{ "node": "Set · Run Globals", "type": "main", "index": 0 }]]
+    },
+    "Set · Run Globals": {
+      "main": [[{ "node": "Google Sheets · Read Sources", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets · Read Sources": {
+      "main": [[{ "node": "Filter · active=true", "type": "main", "index": 0 }]]
+    },
+    "Filter · active=true": {
+      "main": [[{ "node": "Loop Over Sources", "type": "main", "index": 0 }]]
+    },
+    "Loop Over Sources": {
+      "main": [
+        [{ "node": "HTTP · Fetch RSS / Newsroom", "type": "main", "index": 0 }],
+        [{ "node": "Code · Build Telegram Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP · Fetch RSS / Newsroom": {
+      "main": [[{ "node": "Code · Parse Feed", "type": "main", "index": 0 }]]
+    },
+    "Code · Parse Feed": {
+      "main": [[{ "node": "Code · Classify + Score", "type": "main", "index": 0 }]]
+    },
+    "Code · Classify + Score": {
+      "main": [[{ "node": "Code · De-duplicate", "type": "main", "index": 0 }]]
+    },
+    "Code · De-duplicate": {
+      "main": [[{ "node": "HTTP · POST /api/ingest", "type": "main", "index": 0 }]]
+    },
+    "HTTP · POST /api/ingest": {
+      "main": [[{ "node": "Code · Build Log Rows", "type": "main", "index": 0 }]]
+    },
+    "Code · Build Log Rows": {
+      "main": [
+        [
+          { "node": "Google Sheets · Append IngestLog", "type": "main", "index": 0 },
+          { "node": "Loop Over Sources", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Code · Build Telegram Summary": {
+      "main": [[{ "node": "Telegram · Daily Summary", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "rsg-live-ingest-v1.0.0",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "owner": "RSG · Recruiting Solutions Group",
+    "description": "Daily 06:00 CET ingest pipeline. Reads active sources from Google Sheets, fetches RSS / newsrooms, classifies into hiring signal types, posts to /api/ingest, logs every attempt, sends a Telegram summary. Designed to be imported as a draft and activated only after credentials + INGEST_URL are set."
+  },
+  "tags": [
+    { "name": "rsg" },
+    { "name": "hiring-radar" },
+    { "name": "live-ingest" }
+  ]
+}

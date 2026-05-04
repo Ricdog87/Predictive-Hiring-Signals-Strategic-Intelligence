@@ -1,0 +1,2 @@
+active,company_name,company_domain,source_type,rss_url,newsroom_url,country,region,industry,priority
+true,Example AG,example.com,rss,https://example.com/feed.xml,https://example.com/newsroom,DE,DACH · North,Industrial AI,1
