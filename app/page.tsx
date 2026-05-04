@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MarketOverviewHeader } from "@/components/MarketOverviewHeader";
 import { IntelligenceSidebar } from "@/components/IntelligenceSidebar";
 import { WelcomeBanner } from "@/components/WelcomeBanner";
+import { BreakingNewsStrip } from "@/components/BreakingNewsStrip";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
 import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
@@ -166,6 +167,8 @@ export default function DashboardPage() {
             sourcesOnline={sourcesOnline}
             totalSources={DATA_SOURCES.length}
           />
+
+          <BreakingNewsStrip />
 
           <main className="flex-1 px-5 py-6">
             {error && (

@@ -1,6 +1,8 @@
 import { getSignals } from '../../../lib/mockData';
 import { resolveCompany } from '../../../src/companyMaster/match';
 import { fetchDEUnemployment } from '../../../lib/macro';
+import { fetchAllNews } from '../../../lib/newsFetcher';
+import { classifyNewsBatch } from '../../../lib/newsClassifier';
 import type { HiringSignalType } from '../../../lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -40,7 +42,7 @@ const NEGATIVE_TYPES = new Set<HiringSignalType>([
 ]);
 
 export interface TickerItem {
-  kind: 'signal' | 'macro';
+  kind: 'signal' | 'macro' | 'news';
   /** Compact label like `APEX DYNAMICS · Funding` */
   primary: string;
   /** Numeric badge, e.g. `+22%`, `-16%`, `6.0%` */
@@ -51,6 +53,10 @@ export interface TickerItem {
   detail?: string;
   /** Source string, useful for filtering */
   source?: string;
+  /** Optional URL the user can open. */
+  href?: string;
+  /** True for breaking-news items (red dot + EILMELDUNG label). */
+  breaking?: boolean;
 }
 
 function formatDelta(impact: number): string {
@@ -64,12 +70,58 @@ function uppercase(name: string): string {
 }
 
 export async function GET() {
-  const [signals, unemployment] = await Promise.all([
+  const [signals, unemployment, newsBatch] = await Promise.all([
     getSignals(),
     fetchDEUnemployment(),
+    fetchAllNews(),
   ]);
 
-  // Sort by recency × |impact| × confidence — newest, strongest first.
+  const news = classifyNewsBatch(newsBatch.items);
+
+  const items: TickerItem[] = [];
+
+  // 1) Lead with macro — a real-economy data point in the first frame.
+  if (unemployment.ok) {
+    items.push({
+      kind: 'macro',
+      primary: '🇩🇪 ARBEITSLOSENQUOTE',
+      delta: `${unemployment.data.rate.toFixed(1)}%`,
+      tone: 'flat',
+      detail: `Eurostat · ${unemployment.data.period}`,
+      source: 'eurostat',
+    });
+  }
+
+  // 2) Breaking-news items next — these are the "Eilmeldung" surface.
+  const seenNewsKeys = new Set<string>();
+  for (const n of news) {
+    const key = `${n.entity.canonical}:${n.signalType}`;
+    if (seenNewsKeys.has(key)) continue;
+    seenNewsKeys.add(key);
+
+    const tone: TickerItem['tone'] =
+      n.impact > 0 || POSITIVE_TYPES.has(n.signalType)
+        ? 'up'
+        : n.impact < 0 || NEGATIVE_TYPES.has(n.signalType)
+        ? 'down'
+        : 'flat';
+
+    const prefix = n.breaking ? '🔴 EILMELDUNG · ' : '';
+    items.push({
+      kind: 'news',
+      primary: `${prefix}${uppercase(n.entity.canonical)} · ${SIGNAL_LABEL[n.signalType]}`,
+      delta: formatDelta(n.impact),
+      tone,
+      detail: n.title,
+      source: n.sourceLabel,
+      href: n.link,
+      breaking: n.breaking,
+    });
+    if (items.length >= 18) break;
+  }
+
+  // 3) Internal radar signals (live ingest + adapter pipeline) fill
+  //    the remaining slots, dedup against news so we don't double up.
   const ranked = signals
     .map((s) => {
       const ageDays = Math.max(
@@ -85,33 +137,15 @@ export async function GET() {
     .sort((a, b) => b.score - a.score)
     .slice(0, 30);
 
-  const seenCompanies = new Set<string>();
-  const items: TickerItem[] = [];
-
-  // Lead with macro pills so the first frame of the marquee always
-  // carries a real-economy data point.
-  if (unemployment.ok) {
-    items.push({
-      kind: 'macro',
-      primary: '🇩🇪 ARBEITSLOSENQUOTE',
-      delta: `${unemployment.data.rate.toFixed(1)}%`,
-      tone: 'flat',
-      detail: `Eurostat · ${unemployment.data.period}`,
-      source: 'eurostat',
-    });
-  }
-
   for (const { signal } of ranked) {
-    // De-dup per (company × signalType) so the marquee doesn't repeat
-    // the same news 5x in a row.
     const rawName =
       typeof signal.meta?.companyName === 'string'
         ? (signal.meta.companyName as string)
         : signal.companyId;
     const resolved = resolveCompany(rawName);
-    const dedupKey = `${resolved.companyId}:${signal.signalType}`;
-    if (seenCompanies.has(dedupKey)) continue;
-    seenCompanies.add(dedupKey);
+    const key = `${resolved.companyName}:${signal.signalType}`;
+    if (seenNewsKeys.has(key)) continue;
+    seenNewsKeys.add(key);
 
     const tone: TickerItem['tone'] =
       signal.impact > 0 || POSITIVE_TYPES.has(signal.signalType)
@@ -131,8 +165,7 @@ export async function GET() {
           : undefined,
       source: signal.provider,
     });
-
-    if (items.length >= 24) break;
+    if (items.length >= 28) break;
   }
 
   return Response.json({
@@ -142,6 +175,11 @@ export async function GET() {
     macro: unemployment.ok
       ? { deUnemployment: unemployment.data }
       : { deUnemployment: null, error: unemployment.reason },
+    news: {
+      classified: news.length,
+      breaking: news.filter((n) => n.breaking).length,
+      feeds: newsBatch.feeds,
+    },
     generatedAt: new Date().toISOString(),
   });
 }

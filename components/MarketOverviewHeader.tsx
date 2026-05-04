@@ -224,12 +224,14 @@ function Cell({
 }
 
 interface TickerItem {
-  kind: 'signal' | 'macro';
+  kind: 'signal' | 'macro' | 'news';
   primary: string;
   delta: string;
   tone: 'up' | 'down' | 'flat';
   detail?: string;
   source?: string;
+  href?: string;
+  breaking?: boolean;
 }
 
 interface TickerResp {
@@ -295,16 +297,42 @@ function Ticker({ overview }: { overview: MarketOverview }) {
               ? 'text-accent-red'
               : 'text-accent-cyan';
           const arrow = it.tone === 'up' ? '▲' : it.tone === 'down' ? '▼' : '·';
-          return (
-            <span
-              key={i}
-              className="mx-3 flex items-center gap-2 font-mono text-2xs uppercase tracking-wider"
-              title={it.detail}
-            >
+          const inner = (
+            <>
+              {it.breaking && (
+                <span className="flex h-1.5 w-1.5 items-center justify-center">
+                  <span className="absolute inline-flex h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent-red opacity-75" />
+                  <span className="relative inline-flex h-1 w-1 rounded-full bg-accent-red" />
+                </span>
+              )}
               <span className={`${toneClass} font-semibold`}>{arrow}</span>
               <span className="text-text-secondary">{it.primary}</span>
               <span className={toneClass}>{it.delta}</span>
+              {it.source && (
+                <span className="text-text-faint">· {it.source}</span>
+              )}
               <span className="text-text-faint">·</span>
+            </>
+          );
+          const className =
+            'mx-3 flex items-center gap-2 font-mono text-2xs uppercase tracking-wider';
+          if (it.href) {
+            return (
+              <a
+                key={i}
+                href={it.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${className} hover:text-text-primary`}
+                title={it.detail}
+              >
+                {inner}
+              </a>
+            );
+          }
+          return (
+            <span key={i} className={className} title={it.detail}>
+              {inner}
             </span>
           );
         })}
