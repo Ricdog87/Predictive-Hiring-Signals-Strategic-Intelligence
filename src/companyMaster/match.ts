@@ -168,3 +168,59 @@ export function enrichCompany(record: CompanyMasterRecord | undefined): CompanyE
 export function getMasterRecordById(id: string): CompanyMasterRecord | undefined {
   return COMPANY_MASTER.find((r) => r.id === id);
 }
+
+/**
+ * Resolve sector/region/cluster for an existing company profile by consulting
+ * the company master. Tries id lookup first, then a fuzzy name match. Falls
+ * back to the profile's own fields when no master record is available, and
+ * finally to the UNKNOWN_* constants — never to the bare literal "unknown".
+ */
+export interface ProfileLike {
+  id?: string;
+  name?: string;
+  industry?: string;
+  headquarters?: string;
+}
+
+const PLACEHOLDER_VALUES = new Set(['', 'unknown', 'n/a', 'na', 'none']);
+
+function isPlaceholder(value: string | undefined | null): boolean {
+  if (!value) return true;
+  return PLACEHOLDER_VALUES.has(value.trim().toLowerCase());
+}
+
+export interface ProfileEnrichment {
+  sector: string;
+  region: string;
+  cluster: string;
+  headquarters: string;
+  matched: boolean;
+  record?: CompanyMasterRecord;
+}
+
+export function enrichProfile(profile: ProfileLike): ProfileEnrichment {
+  const record =
+    (profile.id ? getMasterRecordById(profile.id) : undefined) ??
+    (profile.name ? findMasterRecord(profile.name) : undefined);
+
+  if (record) {
+    return {
+      sector: record.sector,
+      region: record.region,
+      cluster: record.cluster || fallbackCluster(record.sector, record.region),
+      headquarters: record.headquarters,
+      matched: true,
+      record,
+    };
+  }
+
+  const sector = isPlaceholder(profile.industry) ? UNKNOWN_SECTOR : profile.industry!;
+  const region = isPlaceholder(profile.headquarters) ? UNKNOWN_REGION : profile.headquarters!;
+  return {
+    sector,
+    region,
+    cluster: fallbackCluster(sector, region),
+    headquarters: region,
+    matched: false,
+  };
+}
