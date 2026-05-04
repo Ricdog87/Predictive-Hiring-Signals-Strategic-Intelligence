@@ -12,7 +12,6 @@ import { ForecastPanel } from "@/components/ForecastPanel";
 import { SectorIntelligencePanel } from "@/components/SectorIntelligencePanel";
 import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
 import { MarketClusterView } from "@/components/MarketClusterView";
-import { ArchitectureFlow } from "@/components/ArchitectureFlow";
 import {
   KpiSkeleton,
   TableSkeleton,
@@ -289,15 +288,6 @@ export default function DashboardPage() {
                 hint="aggregate event volume · negative-flag overlay"
               />
               <SignalTimeline companies={filtered} />
-            </div>
-
-            <div className="mt-6">
-              <SectionTitle
-                eyebrow="09 · System"
-                title="Architecture Flow"
-                hint="Sources → n8n → Hermes → Codex → Radar → MiroFish"
-              />
-              <ArchitectureFlow />
             </div>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">

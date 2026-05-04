@@ -55,5 +55,4 @@ export const PRIMARY_NAV: NavSection[] = [
   { id: "sectors", label: "Sector Trends", glyph: "▤" },
   { id: "regions", label: "Region Trends", glyph: "◬" },
   { id: "clusters", label: "Cluster Heatmap", glyph: "▦" },
-  { id: "flows", label: "System Flow", glyph: "⇌" },
 ];
