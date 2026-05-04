@@ -9,6 +9,7 @@ import type {
   RegionTrend,
   MarketCluster,
 } from "./uiContracts/market";
+import { enrichProfile } from "../src/companyMaster/match";
 
 /**
  * Codex → UI view-model layer.
@@ -137,12 +138,19 @@ export function toCompanyView(agg: CompanyAggregate): CompanyView {
     return parts.join(" · ") || "Awaiting first scored snapshot.";
   })();
 
+  const enrichment = enrichProfile({
+    id: agg.company.id,
+    name: agg.company.name,
+    industry: agg.company.industry,
+    headquarters: agg.company.headquarters,
+  });
+
   return {
     id: agg.company.id,
     name: agg.company.name,
-    industry: agg.company.industry || "unknown",
-    region: agg.company.headquarters || "unknown",
-    headquarters: agg.company.headquarters || "unknown",
+    industry: enrichment.sector,
+    region: enrichment.region,
+    headquarters: enrichment.headquarters,
     employeeCount: agg.company.employeeCount,
     description,
     hiringScore,

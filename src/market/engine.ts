@@ -1,11 +1,12 @@
 import { CompanyAggregate, CompanyProfile, CompanySignal } from '../../lib/types';
 import { UNKNOWN_REGION, UNKNOWN_SECTOR } from '../companyMaster/master';
+import { enrichProfile } from '../companyMaster/match';
 import { MarketCluster, MarketOverview, RegionTrend, SectorTrend } from './types';
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const trend = (v: number) => (v > 0.1 ? 'up' : v < -0.1 ? 'down' : 'flat');
-const sectorOf = (c: CompanyProfile) => c.industry || UNKNOWN_SECTOR;
-const regionOf = (c: CompanyProfile) => c.headquarters || UNKNOWN_REGION;
+const sectorOf = (c: CompanyProfile) => enrichProfile(c).sector;
+const regionOf = (c: CompanyProfile) => enrichProfile(c).region;
 
 export function computeMarketOverview(companies: CompanyProfile[], signals: CompanySignal[], aggregates: CompanyAggregate[]): MarketOverview {
   const scores = aggregates.map((a) => a.latestScore?.hiringScore ?? 0);
