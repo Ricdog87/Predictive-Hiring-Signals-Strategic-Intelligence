@@ -144,16 +144,21 @@ export function MacroStrip() {
           source="Eurostat · 15-64 SA"
         />
         <Tile
-          label="DE Vakanzquote"
+          label="DE Industrieklima"
           value={state.jobVacancy?.rate}
-          suffix="%"
           decimals={1}
           period={state.jobVacancy?.period}
-          tone="cyan"
-          source="Eurostat · jvs_q_nace2"
+          tone={
+            (state.jobVacancy?.rate ?? 0) >= 0
+              ? 'green'
+              : (state.jobVacancy?.rate ?? 0) <= -10
+              ? 'red'
+              : 'amber'
+          }
+          source="Eurostat · ei_bssi_m_r2 · Industrial Confidence (SA)"
         />
         <Tile
-          label="DE CLI · Frühindikator"
+          label="DE Sentiment · ESI"
           value={state.cli?.value}
           decimals={1}
           period={state.cli?.period}
@@ -164,7 +169,11 @@ export function MacroStrip() {
               ? 'red'
               : 'violet'
           }
-          source={state.cli?.trend ? `OECD · ${state.cli.trend}` : 'OECD · MEI'}
+          source={
+            state.cli?.trend
+              ? `Eurostat · Economic Sentiment · ${state.cli.trend}`
+              : 'Eurostat · ei_bssi_m_r2 · BS-ESI-I'
+          }
         />
       </div>
     </section>

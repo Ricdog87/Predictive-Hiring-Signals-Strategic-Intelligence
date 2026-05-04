@@ -43,12 +43,10 @@ const FEEDS: ReadonlyArray<{
     url: 'https://www.spiegel.de/schlagzeilen/index.rss',
     trust: 0.85,
   },
-  {
-    source: 'tagesschau-eilmeldungen',
-    label: 'Tagesschau · Eilmeldungen',
-    url: 'https://www.tagesschau.de/eilmeldungen/index~rss2.xml',
-    trust: 0.95,
-  },
+  // Tagesschau eilmeldungen RSS retired upstream (HTTP 404 since 2025);
+  // breaking news from Tagesschau still flows through the main
+  // wirtschaft feed above. Re-add a replacement URL here if ARD
+  // restores a public eilmeldungen RSS.
   {
     source: 'zeit-wirtschaft',
     label: 'Zeit · Wirtschaft',

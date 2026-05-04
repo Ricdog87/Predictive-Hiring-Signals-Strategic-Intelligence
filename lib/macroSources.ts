@@ -232,32 +232,40 @@ export interface EurostatSnapshot {
  * and stick to the four required dimensions: geo, nace_r2, s_adj,
  * unit. Falls back to NSA if the SA series has no data.
  */
+/**
+ * DE Industrial Confidence Indicator — Eurostat `ei_bssi_m_r2` ·
+ * `BS-ICI-BAL` (industrial confidence balance, monthly, SA).
+ *
+ * Replaces the original `jvs_q_nace2 / JOBRATE` job-vacancy rate
+ * (which Eurostat ships with empty values for DE in v2.0). Industrial
+ * confidence is the more reliable lead indicator for *industrial*
+ * hiring — when manufacturing CFOs say they expect higher output 3
+ * months out, hiring follows ~30-60 days later. Same parser, same
+ * cache strategy, no other call-site changes — the API response
+ * format is identical.
+ */
 export async function fetchDEJobVacancyRate(): Promise<
   | { ok: true; data: EurostatSnapshot }
   | { ok: false; reason: string; detail?: string }
 > {
-  // jvs_q_nace2 dimensions: geo, indic_em, nace_r2, s_adj, sizeclas
-  // (no `unit` dimension — vacancy rate is the inherent unit).
-  const tryOne = async (sAdj: 'SA' | 'NSA') => {
-    const url = `${EUROSTAT_BASE}/jvs_q_nace2?geo=DE&nace_r2=B-S&s_adj=${sAdj}&sizeclas=TOTAL&indic_em=JOBRATE&lang=EN`;
-    const r = await fetchJsonSafe<JsonStatLite>({ url });
-    if (!r.ok) return r;
-    const latest = parseLatestEurostat(r.data);
-    if (!latest) return { ok: false as const, reason: 'parse_error' as const };
-    return {
-      ok: true as const,
-      data: {
-        rate: latest.value,
-        period: latest.period,
-        source: 'eurostat' as const,
-        indicator: `jvs_q_nace2 · DE · B-S · ${sAdj} · JOBRATE`,
-        fetchedAt: new Date().toISOString(),
-      },
-    };
+  const url =
+    `${EUROSTAT_BASE}/ei_bssi_m_r2?geo=DE&indic=BS-ICI-BAL&s_adj=SA&lang=EN`;
+  const r = await fetchJsonSafe<JsonStatLite>({ url });
+  if (!r.ok) return r;
+  const latest = parseLatestEurostat(r.data);
+  if (!latest) {
+    return { ok: false, reason: 'parse_error', detail: 'no observation' };
+  }
+  return {
+    ok: true,
+    data: {
+      rate: latest.value,
+      period: latest.period,
+      source: 'eurostat',
+      indicator: 'ei_bssi_m_r2 · DE · industrial confidence (SA)',
+      fetchedAt: new Date().toISOString(),
+    },
   };
-  const sa = await tryOne('SA');
-  if (sa.ok) return sa;
-  return tryOne('NSA');
 }
 
 /**
@@ -326,62 +334,79 @@ export interface OECDSnapshot {
   fetchedAt: string;
 }
 
-function classifyCli(latest: number, prev?: number): OECDSnapshot['trend'] {
+/**
+ * Trend classifier for survey-balance indicators (range typically
+ * -50..+50, where 0 is the long-run average / neutral).
+ */
+function classifyConfidenceTrend(
+  latest: number,
+  prev?: number
+): OECDSnapshot['trend'] {
   if (prev === undefined) {
-    return latest >= 100 ? 'expanding' : 'contracting';
+    return latest >= 0 ? 'expanding' : 'contracting';
   }
   const delta = latest - prev;
-  if (latest >= 100 && delta >= 0.05) return 'expanding';
-  if (latest >= 100 && delta < -0.05) return 'slowing';
-  if (latest < 100 && delta >= 0.05) return 'recovering';
-  if (latest < 100 && delta < -0.05) return 'contracting';
+  if (latest >= 0 && delta >= 0.5) return 'expanding';
+  if (latest >= 0 && delta < -0.5) return 'slowing';
+  if (latest < 0 && delta >= 0.5) return 'recovering';
+  if (latest < 0 && delta < -0.5) return 'contracting';
   return 'flat';
 }
 
+/**
+ * DE Economic Sentiment Indicator — replaces the legacy OECD CLI.
+ * Eurostat `ei_bssi_m_r2 · BS-ESI-I` is monthly, seasonally adjusted,
+ * and has continuous live data (the old OECD endpoint migrated in
+ * 2024 and the new SDMX-2.0 payload format isn't compatible with our
+ * parser). The ESI is the EU-Commission equivalent of the OECD CLI
+ * — same conceptual "are firms expanding or contracting?" reading,
+ * just published from Brussels instead of Paris.
+ *
+ * The function name and OECDSnapshot return type stay for API
+ * compatibility with /api/macro/cli + /api/intel/snapshot consumers
+ * — only the `source` and `indicator` fields change.
+ */
 export async function fetchDECompositeLeadingIndicator(): Promise<
   | { ok: true; data: OECDSnapshot }
   | { ok: false; reason: string; detail?: string }
 > {
-  // OECD migrated stats.oecd.org → sdmx.oecd.org in 2024. The new
-  // SDMX-JSON endpoint follows the same payload shape (dataSets +
-  // observation dimensions), but the dataflow id is verbose.
-  // Falls back to the legacy endpoint for graceful coverage.
-  const newUrl =
-    'https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0/DEU.M.LI...AA...H?lastNObservations=24';
-  const legacyUrl =
-    'https://stats.oecd.org/sdmx-json/data/MEI_CLI/LOLITONO.DEU.M/all?lastNObservations=24';
-  const r =
-    (await fetchJsonSafe<OecdSdmxV1>({ url: newUrl })).ok
-      ? await fetchJsonSafe<OecdSdmxV1>({ url: newUrl })
-      : await fetchJsonSafe<OecdSdmxV1>({ url: legacyUrl });
+  const url = `${EUROSTAT_BASE}/ei_bssi_m_r2?geo=DE&indic=BS-ESI-I&s_adj=SA&lang=EN&lastTimePeriod=24`;
+  const r = await fetchJsonSafe<JsonStatLite>({ url });
   if (!r.ok) return r;
-  const series = r.data?.dataSets?.[0]?.series;
-  if (!series) return { ok: false, reason: 'parse_error' };
-  const timeDim = r.data?.structure?.dimensions?.observation?.find(
-    (d) => d.id === 'TIME_PERIOD'
+  const idx = r.data?.dimension?.time?.category?.index;
+  const values = r.data?.value;
+  if (!idx || !values) {
+    return { ok: false, reason: 'parse_error', detail: 'no time dimension' };
+  }
+  // Find the latest two observations with finite values to derive trend.
+  const sorted = Object.entries(idx).sort(
+    (a, b) => (b[1] as number) - (a[1] as number)
   );
-  const timeValues = timeDim?.values ?? [];
-
-  // Single key in a single-series response — grab it
-  const onlySeries = Object.values(series)[0];
-  const obs = onlySeries?.observations ?? {};
-  const sorted = Object.entries(obs)
-    .map(([k, v]) => ({ idx: Number(k), val: v?.[0] }))
-    .filter((x) => Number.isFinite(x.idx) && typeof x.val === 'number')
-    .sort((a, b) => b.idx - a.idx);
-
-  if (sorted.length === 0) return { ok: false, reason: 'parse_error' };
-  const latest = sorted[0];
-  const prev = sorted[1];
-  const period = timeValues[latest.idx]?.id ?? `idx${latest.idx}`;
+  const observations: Array<{ value: number; period: string }> = [];
+  for (const [period, pos] of sorted) {
+    const v = Array.isArray(values) ? values[pos] : values[String(pos)];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      observations.push({ value: v, period });
+    }
+    if (observations.length >= 2) break;
+  }
+  if (observations.length === 0) {
+    return { ok: false, reason: 'parse_error', detail: 'no numeric observation' };
+  }
+  const latest = observations[0];
+  const prev = observations[1];
   return {
     ok: true,
     data: {
-      value: Math.round((latest.val as number) * 100) / 100,
-      period,
+      // Eurostat ESI is centred around 100 historically — present as
+      // index value, classify trend via signed delta.
+      value: Math.round(latest.value * 100) / 100,
+      period: latest.period,
+      // We keep `source: oecd` in the type to avoid breaking the
+      // discriminated union, but the runtime tag tells the truth:
       source: 'oecd',
-      indicator: 'MEI_CLI · LOLITONO · DEU · monthly',
-      trend: classifyCli(latest.val as number, prev?.val as number | undefined),
+      indicator: 'eurostat · ei_bssi_m_r2 · BS-ESI-I (Economic Sentiment Indicator) · DE · SA',
+      trend: classifyConfidenceTrend(latest.value - 100, prev ? prev.value - 100 : undefined),
       fetchedAt: new Date().toISOString(),
     },
   };
