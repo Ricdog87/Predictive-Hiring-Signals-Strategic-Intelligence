@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MarketOverviewHeader } from "@/components/MarketOverviewHeader";
 import { IntelligenceSidebar } from "@/components/IntelligenceSidebar";
+import { WelcomeBanner } from "@/components/WelcomeBanner";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
 import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
@@ -11,7 +12,6 @@ import { ForecastPanel } from "@/components/ForecastPanel";
 import { SectorIntelligencePanel } from "@/components/SectorIntelligencePanel";
 import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
 import { MarketClusterView } from "@/components/MarketClusterView";
-import { ArchitectureFlow } from "@/components/ArchitectureFlow";
 import {
   KpiSkeleton,
   TableSkeleton,
@@ -25,6 +25,8 @@ import {
   fetchSectorTrends,
 } from "@/lib/marketIntelligence";
 import { toCompanyViews, type CompanyView } from "@/lib/marketView";
+import { getSessionUser } from "@/lib/session";
+import { DATA_SOURCES } from "@/lib/uiMockData";
 import type {
   MarketCluster,
   MarketOverview,
@@ -62,6 +64,11 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const user = useMemo(() => getSessionUser(), []);
+  const sourcesOnline = useMemo(
+    () => DATA_SOURCES.filter((s) => s.status === "live").length,
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -139,21 +146,28 @@ export default function DashboardPage() {
 
   return (
     <div className="relative min-h-screen bg-bg-base">
-      <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-60" />
+      <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-40" />
 
       <div className="relative flex min-h-screen">
-        <IntelligenceSidebar />
+        <IntelligenceSidebar user={user} />
 
         <div className="flex min-w-0 flex-1 flex-col">
           {data.overview ? (
-            <MarketOverviewHeader overview={data.overview} />
+            <MarketOverviewHeader overview={data.overview} user={user} />
           ) : (
             <div className="border-b border-bg-border bg-bg-surface px-5 py-3 font-mono text-2xs uppercase tracking-terminal text-text-muted">
               loading market overview…
             </div>
           )}
 
-          <main className="flex-1 px-5 py-5">
+          <WelcomeBanner
+            user={user}
+            overview={data.overview}
+            sourcesOnline={sourcesOnline}
+            totalSources={DATA_SOURCES.length}
+          />
+
+          <main className="flex-1 px-5 py-6">
             {error && (
               <div className="mb-4 rounded-sm border border-accent-red/40 bg-accent-red/[0.06] px-3 py-2 font-mono text-[11px] text-accent-red">
                 api error · {error}
@@ -274,15 +288,6 @@ export default function DashboardPage() {
                 hint="aggregate event volume · negative-flag overlay"
               />
               <SignalTimeline companies={filtered} />
-            </div>
-
-            <div className="mt-6">
-              <SectionTitle
-                eyebrow="09 · System"
-                title="Architecture Flow"
-                hint="Sources → n8n → Hermes → Codex → Radar → MiroFish"
-              />
-              <ArchitectureFlow />
             </div>
 
             <footer className="mt-10 flex flex-col items-center justify-between gap-2 border-t border-bg-border pt-6 font-mono text-2xs uppercase tracking-wider text-text-muted md:flex-row">

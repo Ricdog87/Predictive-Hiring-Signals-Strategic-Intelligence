@@ -1,5 +1,13 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Hiring Radar · Light Premium Theme.
+ *
+ * Color palette taken 1:1 from the warm-cream Hiring Signals Desk
+ * reference screenshot. Token names are kept (`bg.base`, `accent.cyan`,
+ * `text.primary` …) so every existing component re-themes automatically
+ * — no JSX changes are needed for the dark→light flip.
+ */
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -9,34 +17,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Surfaces — warm cream / sand palette.
         bg: {
-          base: "#06070A",
-          surface: "#0B0D12",
-          panel: "#0F1218",
-          elevated: "#141822",
-          border: "#1B2030",
-          line: "#222838",
-          rule: "#2A3142",
+          base: "#ECE4D2",      // page background
+          surface: "#F2EBDB",   // sidebar, header, banner strip
+          panel: "#F8F2E5",     // primary card
+          elevated: "#FBF6EB",  // hover / elevated card
+          border: "#D8CDB5",    // visible card border
+          line: "#E5DCC4",      // subtle divider
+          rule: "#EEE6D2",      // very faint rule
         },
+        // Accents — preserved Bloomberg/RSG palette, darkened so that
+        // numbers, badges and trend arrows hold contrast on the warm
+        // light background while keeping the same visual language.
         accent: {
-          cyan: "#22D3EE",
-          ink: "#7DD3FC",
-          violet: "#A78BFA",
-          green: "#34D399",
-          amber: "#FBBF24",
-          red: "#F87171",
-          rose: "#FB7185",
+          cyan: "#0E6B85",      // primary RSG petrol/teal
+          ink: "#1F7E96",       // softer ink-blue
+          violet: "#6D4FC4",
+          green: "#3A8841",
+          amber: "#B07C12",
+          red: "#BE3C3C",
+          rose: "#C84F60",
         },
         text: {
-          primary: "#E6E8EE",
-          secondary: "#9AA3B2",
-          muted: "#5A6478",
-          faint: "#3A4154",
+          primary: "#1B1610",   // warm near-black, body + numbers
+          secondary: "#5C5547", // warm mid-gray
+          muted: "#8E867A",     // labels / eyebrows
+          faint: "#B5AC9C",     // fainter hints
         },
         sig: {
-          up: "#34D399",
-          down: "#F87171",
-          neutral: "#7DD3FC",
+          up: "#3A8841",
+          down: "#BE3C3C",
+          neutral: "#1F7E96",
         },
       },
       fontFamily: {
@@ -64,15 +76,15 @@ const config: Config = {
         terminal: "0.18em",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(34,211,238,0.18), 0 0 30px -8px rgba(34,211,238,0.35)",
+        glow: "0 0 0 1px rgba(14,107,133,0.18), 0 0 30px -8px rgba(14,107,133,0.30)",
         panel:
-          "inset 0 1px 0 rgba(255,255,255,0.02), 0 1px 0 rgba(0,0,0,0.4)",
+          "0 1px 0 rgba(0,0,0,0.03), 0 1px 2px rgba(31,28,18,0.04)",
       },
       backgroundImage: {
         "scan-grid":
-          "linear-gradient(rgba(125,211,252,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(125,211,252,0.04) 1px, transparent 1px)",
+          "linear-gradient(rgba(31,28,18,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(31,28,18,0.04) 1px, transparent 1px)",
         "panel-gradient":
-          "linear-gradient(180deg, rgba(125,211,252,0.04) 0%, rgba(125,211,252,0) 60%)",
+          "linear-gradient(180deg, rgba(14,107,133,0.04) 0%, rgba(14,107,133,0) 60%)",
       },
       backgroundSize: {
         "grid-32": "32px 32px",
@@ -80,6 +92,12 @@ const config: Config = {
       animation: {
         "pulse-soft": "pulseSoft 2.4s ease-in-out infinite",
         ticker: "ticker 60s linear infinite",
+        "slide-down": "slideDown 600ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-in": "fadeIn 600ms ease-out both",
+        "fade-in-up": "fadeInUp 700ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "boot-fill": "bootFill 1400ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "scan-sweep": "scanSweep 2.6s ease-in-out infinite",
+        "cursor-blink": "cursorBlink 1.05s steps(2, end) infinite",
       },
       keyframes: {
         pulseSoft: {
@@ -89,6 +107,31 @@ const config: Config = {
         ticker: {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
+        },
+        slideDown: {
+          "0%": { transform: "translateY(-12px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        fadeInUp: {
+          "0%": { transform: "translateY(8px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        bootFill: {
+          "0%": { width: "0%" },
+          "100%": { width: "100%" },
+        },
+        scanSweep: {
+          "0%": { transform: "translateX(-100%)", opacity: "0" },
+          "20%": { opacity: "0.6" },
+          "100%": { transform: "translateX(220%)", opacity: "0" },
+        },
+        cursorBlink: {
+          "0%, 100%": { opacity: "0" },
+          "50%": { opacity: "1" },
         },
       },
     },

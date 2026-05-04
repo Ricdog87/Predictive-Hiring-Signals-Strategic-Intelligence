@@ -28,14 +28,14 @@ export function HiringScoreBadge({
 
   const color =
     strength === "critical"
-      ? "#A78BFA"
+      ? "#6D4FC4"
       : strength === "strong"
-      ? "#22D3EE"
+      ? "#0E6B85"
       : strength === "moderate"
-      ? "#FBBF24"
-      : "#5A6478";
+      ? "#B07C12"
+      : "#8E867A";
   const confColor =
-    confidence >= 80 ? "#34D399" : confidence >= 50 ? "#7DD3FC" : "#FBBF24";
+    confidence >= 80 ? "#3A8841" : confidence >= 50 ? "#1F7E96" : "#B07C12";
 
   const fontSize =
     size === "lg" ? "text-2xl" : size === "md" ? "text-base" : "text-[11px]";
@@ -46,7 +46,7 @@ export function HiringScoreBadge({
       style={{ width: dim, height: dim }}
     >
       <svg width={dim} height={dim} className="-rotate-90">
-        <circle cx={dim / 2} cy={dim / 2} r={ro} stroke="#1B2030" strokeWidth={outerStroke} fill="none" />
+        <circle cx={dim / 2} cy={dim / 2} r={ro} stroke="#D8CDB5" strokeWidth={outerStroke} fill="none" />
         <circle
           cx={dim / 2}
           cy={dim / 2}
@@ -65,7 +65,7 @@ export function HiringScoreBadge({
             transition: "stroke-dashoffset 400ms ease",
           }}
         />
-        <circle cx={dim / 2} cy={dim / 2} r={ri} stroke="#1B2030" strokeWidth={innerStroke} fill="none" />
+        <circle cx={dim / 2} cy={dim / 2} r={ri} stroke="#D8CDB5" strokeWidth={innerStroke} fill="none" />
         <circle
           cx={dim / 2}
           cy={dim / 2}

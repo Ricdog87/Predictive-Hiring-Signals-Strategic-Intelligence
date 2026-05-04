@@ -214,12 +214,12 @@ function ClusterCell({
   const risk = levelFromScore(cluster.riskLevel);
   const baseColor =
     mode === "risk"
-      ? `rgba(248,113,113,${intensity * 0.55})`
+      ? `rgba(190,60,60,${intensity * 0.45})`
       : mode === "opportunity"
       ? opp === "elevated"
-        ? `rgba(167,139,250,${intensity * 0.65})`
-        : `rgba(34,211,238,${intensity * 0.6})`
-      : `rgba(34,211,238,${intensity * 0.6})`;
+        ? `rgba(109,79,196,${intensity * 0.45})`
+        : `rgba(14,107,133,${intensity * 0.45})`
+      : `rgba(14,107,133,${intensity * 0.45})`;
 
   const ring = selected
     ? "ring-1 ring-accent-cyan"
