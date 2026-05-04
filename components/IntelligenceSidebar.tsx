@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import { DATA_SOURCES, PRIMARY_NAV } from "@/lib/uiMockData";
 import type { SessionUser } from "@/lib/session";
+import { useWatchlist } from "@/lib/watchlist";
+import type { CompanyView } from "@/lib/marketView";
 
 interface IntelligenceSidebarProps {
   user?: SessionUser;
+  companies?: CompanyView[];
+  onSelectCompany?: (companyId: string) => void;
+  onOpenPalette?: () => void;
 }
 
 function useActiveSection(anchors: string[]): string | null {
@@ -45,9 +50,18 @@ function scrollToAnchor(anchor: string) {
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-export function IntelligenceSidebar({ user }: IntelligenceSidebarProps = {}) {
+export function IntelligenceSidebar({
+  user,
+  companies = [],
+  onSelectCompany,
+  onOpenPalette,
+}: IntelligenceSidebarProps = {}) {
   const anchors = PRIMARY_NAV.map((n) => n.anchor);
   const active = useActiveSection(anchors);
+  const { pinned, toggle } = useWatchlist();
+  const watchlistCompanies = pinned
+    .map((id) => companies.find((c) => c.id === id))
+    .filter((c): c is CompanyView => Boolean(c));
   return (
     <aside className="hidden lg:flex w-[236px] shrink-0 flex-col border-r border-bg-border bg-bg-surface">
       <div className="flex h-12 items-center gap-2.5 border-b border-bg-border px-4">
@@ -117,6 +131,77 @@ export function IntelligenceSidebar({ user }: IntelligenceSidebarProps = {}) {
             );
           })}
         </ul>
+
+        {onOpenPalette && (
+          <div className="mt-3 px-2">
+            <button
+              type="button"
+              onClick={onOpenPalette}
+              className="flex w-full items-center justify-between rounded-sm border border-bg-border bg-bg-elevated/40 px-2 py-1.5 text-left text-[12px] text-text-secondary hover:border-accent-cyan/40 hover:text-text-primary transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <span className="font-mono text-text-muted">⌕</span>
+                <span>Quick search</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="kbd">⌘</span>
+                <span className="kbd">K</span>
+              </span>
+            </button>
+          </div>
+        )}
+
+        <div className="mt-5">
+          <SectionHeader
+            label="Watchlist"
+            right={`${watchlistCompanies.length}`}
+          />
+          {watchlistCompanies.length === 0 ? (
+            <div className="px-2 py-1 font-mono text-2xs uppercase tracking-terminal text-text-muted">
+              pin companies via the ★ button
+            </div>
+          ) : (
+            <ul className="space-y-0.5">
+              {watchlistCompanies.map((c) => (
+                <li
+                  key={c.id}
+                  className="group flex items-center gap-2 rounded-sm px-2 py-1 hover:bg-bg-elevated"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSelectCompany?.(c.id)}
+                    className="flex flex-1 items-center justify-between text-left"
+                    title={c.industry}
+                  >
+                    <span className="truncate text-[12px] text-text-secondary group-hover:text-text-primary">
+                      {c.name}
+                    </span>
+                    <span
+                      className={`num text-[11px] font-semibold ${
+                        c.hiringScore >= 70
+                          ? "text-accent-green"
+                          : c.hiringScore >= 50
+                          ? "text-accent-cyan"
+                          : "text-text-muted"
+                      }`}
+                    >
+                      {Math.round(c.hiringScore)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggle(c.id)}
+                    className="text-accent-amber hover:text-accent-red"
+                    title="Unpin"
+                    aria-label="Unpin"
+                  >
+                    ★
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="mt-5">
           <SectionHeader

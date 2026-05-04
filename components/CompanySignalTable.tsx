@@ -4,6 +4,7 @@ import type { CompanyView } from "@/lib/marketView";
 import { formatPct, strengthStyles, forecastStyles } from "@/lib/format";
 import { signalTypeShortLabel } from "@/lib/marketIntelligence";
 import { TableEmptyState } from "./EmptyStates";
+import { useWatchlist } from "@/lib/watchlist";
 
 interface CompanySignalTableProps {
   companies: CompanyView[];
@@ -18,6 +19,7 @@ export function CompanySignalTable({
   onSelect,
   onClearFilters,
 }: CompanySignalTableProps) {
+  const { isPinned, toggle } = useWatchlist();
   return (
     <div className="panel">
       <div className="panel-header">
@@ -39,6 +41,7 @@ export function CompanySignalTable({
         <table className="min-w-full text-[12.5px]">
           <thead>
             <tr className="border-b border-bg-border bg-bg-surface/40 text-left">
+              <Th>★</Th>
               <Th>#</Th>
               <Th>Company</Th>
               <Th>Sector · Region</Th>
@@ -59,6 +62,7 @@ export function CompanySignalTable({
               const f = forecastStyles[c.forecastBand];
               const negative = c.isNegativeFlagged;
               const driver = c.drivers[0];
+              const pinned = isPinned(c.id);
               return (
                 <tr
                   key={c.id}
@@ -67,6 +71,24 @@ export function CompanySignalTable({
                     isSelected ? "bg-accent-cyan/[0.07]" : "hover:bg-bg-elevated/50"
                   }`}
                 >
+                  <td className="px-2 py-2 align-middle">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle(c.id);
+                      }}
+                      title={pinned ? "Unpin from watchlist" : "Pin to watchlist"}
+                      aria-label={pinned ? "Unpin" : "Pin"}
+                      className={`text-[14px] transition-colors ${
+                        pinned
+                          ? "text-accent-amber hover:text-accent-red"
+                          : "text-text-faint hover:text-accent-amber"
+                      }`}
+                    >
+                      {pinned ? "★" : "☆"}
+                    </button>
+                  </td>
                   <td className="px-3 py-2 align-middle font-mono text-2xs text-text-faint">
                     {String(idx + 1).padStart(2, "0")}
                   </td>
@@ -153,7 +175,7 @@ export function CompanySignalTable({
             })}
             {companies.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-0 py-0">
+                <td colSpan={12} className="px-0 py-0">
                   <TableEmptyState onClear={onClearFilters} />
                 </td>
               </tr>

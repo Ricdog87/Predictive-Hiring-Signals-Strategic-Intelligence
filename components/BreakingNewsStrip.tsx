@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface NewsEntity {
   canonical: string;
@@ -74,6 +74,8 @@ function relTime(iso: string): string {
 export function BreakingNewsStrip() {
   const [data, setData] = useState<NewsResp | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const seenLinksRef = useRef<Set<string>>(new Set());
+  const [freshLinks, setFreshLinks] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +85,19 @@ export function BreakingNewsStrip() {
         if (!res.ok) throw new Error(`status ${res.status}`);
         const json = (await res.json()) as NewsResp;
         if (!cancelled) {
+          // Track which links are new since the last poll → highlight them.
+          const incoming = new Set((json.items ?? []).map((i) => i.link));
+          const fresh = new Set<string>();
+          for (const lnk of incoming) {
+            if (!seenLinksRef.current.has(lnk)) fresh.add(lnk);
+          }
+          // Skip the first load (don't highlight everything as new on mount).
+          if (seenLinksRef.current.size > 0 && fresh.size > 0) {
+            setFreshLinks(fresh);
+            // Auto-clear the fresh marker after the highlight animation
+            setTimeout(() => setFreshLinks(new Set()), 3500);
+          }
+          seenLinksRef.current = incoming;
           setData(json);
           setError(null);
         }
@@ -167,13 +182,16 @@ export function BreakingNewsStrip() {
             ? "▼"
             : "·";
           const label = SIGNAL_LABEL[n.signalType] ?? n.signalType;
+          const isFresh = freshLinks.has(n.link);
           return (
             <li key={i}>
               <a
                 href={n.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 px-5 py-1.5 hover:bg-bg-elevated/40 transition-colors"
+                className={`flex items-center gap-3 px-5 py-1.5 transition-colors hover:bg-bg-elevated/40 ${
+                  isFresh ? "animate-highlight-fade" : ""
+                }`}
                 title={n.title}
               >
                 <span

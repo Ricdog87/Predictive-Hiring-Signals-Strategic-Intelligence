@@ -98,6 +98,9 @@ const config: Config = {
         "boot-fill": "bootFill 1400ms cubic-bezier(0.22, 1, 0.36, 1) both",
         "scan-sweep": "scanSweep 2.6s ease-in-out infinite",
         "cursor-blink": "cursorBlink 1.05s steps(2, end) infinite",
+        "pulse-pop": "pulsePop 1.6s ease-out 1",
+        "highlight-fade": "highlightFade 3.2s ease-out 1",
+        "shimmer-slide": "shimmerSlide 1.8s ease-in-out infinite",
       },
       keyframes: {
         pulseSoft: {
@@ -132,6 +135,28 @@ const config: Config = {
         cursorBlink: {
           "0%, 100%": { opacity: "0" },
           "50%": { opacity: "1" },
+        },
+        pulsePop: {
+          "0%": {
+            transform: "scale(1)",
+            boxShadow: "0 0 0 0 rgba(14,107,133,0.45)",
+          },
+          "30%": {
+            transform: "scale(1.015)",
+            boxShadow: "0 0 0 8px rgba(14,107,133,0.10)",
+          },
+          "100%": {
+            transform: "scale(1)",
+            boxShadow: "0 0 0 14px rgba(14,107,133,0)",
+          },
+        },
+        highlightFade: {
+          "0%": { backgroundColor: "rgba(14,107,133,0.18)" },
+          "100%": { backgroundColor: "transparent" },
+        },
+        shimmerSlide: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
         },
       },
     },

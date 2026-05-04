@@ -7,6 +7,7 @@ import {
   temperatureForScore,
 } from "@/lib/marketIntelligence";
 import type { SessionUser } from "@/lib/session";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 interface MarketOverviewHeaderProps {
   overview: MarketOverview;
@@ -77,43 +78,45 @@ export function MarketOverviewHeader({
       <div className="grid grid-cols-2 gap-px bg-bg-border md:grid-cols-4 xl:grid-cols-7">
         <Cell
           label="Total signals"
-          value={overview.totalSignals.toLocaleString()}
+          numericValue={overview.totalSignals}
           hint={`${overview.newSignals24h} new · 24h`}
         />
         <Cell
           label="High-prob. companies"
-          value={overview.highProbabilityCompanies.toString()}
+          numericValue={overview.highProbabilityCompanies}
           hint="hiring score ≥ 70"
           tone="cyan"
         />
         <Cell
           label="Avg hiring score"
-          value={overview.averageHiringScore.toString()}
+          numericValue={overview.averageHiringScore}
+          decimals={1}
           hint="across radar"
           tone="cyan"
         />
         <Cell
           label="Avg window"
-          value={`${overview.averageHiringWindowDays}d`}
+          numericValue={overview.averageHiringWindowDays}
+          suffix="d"
           hint="forecast median"
           tone="violet"
         />
         <Cell
           label="New · 24h"
-          value={overview.newSignals24h.toString()}
+          numericValue={overview.newSignals24h}
           hint="company signals"
           tone="green"
         />
         <Cell
           label="Positive growth"
-          value={overview.positiveGrowthSignals.toString()}
+          numericValue={overview.positiveGrowthSignals}
           hint="hiring · funding · expansion"
           tone="green"
           accentBar="bg-accent-green"
         />
         <Cell
           label="Negative risk"
-          value={overview.negativeRiskSignals.toString()}
+          numericValue={overview.negativeRiskSignals}
           hint="layoff / pivot"
           tone="red"
           accentBar="bg-accent-red"
@@ -184,12 +187,18 @@ function Meta({
 function Cell({
   label,
   value,
+  numericValue,
+  decimals = 0,
+  suffix,
   hint,
   tone,
   accentBar,
 }: {
   label: string;
-  value: string;
+  value?: string;
+  numericValue?: number;
+  decimals?: number;
+  suffix?: string;
   hint?: string;
   tone?: "cyan" | "violet" | "green" | "red";
   accentBar?: string;
@@ -205,12 +214,26 @@ function Cell({
       ? "text-accent-red"
       : "text-text-primary";
   return (
-    <div className="relative bg-bg-panel px-4 py-2.5">
+    <div className="relative bg-bg-panel px-4 py-2.5 transition-colors hover:bg-bg-elevated/40">
       <div className="flex items-center justify-between">
         <span className="label-eyebrow truncate">{label}</span>
-        <span className="text-2xs font-mono text-text-faint">live</span>
+        <span className="flex items-center gap-1 text-2xs font-mono text-text-faint">
+          <span className="h-1 w-1 rounded-full bg-accent-green animate-pulse-soft" />
+          live
+        </span>
       </div>
-      <div className={`num mt-1 text-[15px] font-semibold ${fg}`}>{value}</div>
+      <div className={`mt-1 text-[15px] font-semibold ${fg}`}>
+        {numericValue !== undefined ? (
+          <AnimatedNumber
+            value={numericValue}
+            decimals={decimals}
+            suffix={suffix}
+            className="num"
+          />
+        ) : (
+          <span className="num">{value}</span>
+        )}
+      </div>
       {hint && (
         <div className="text-2xs font-mono uppercase tracking-wider text-text-muted">
           {hint}

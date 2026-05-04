@@ -5,6 +5,9 @@ import { MarketOverviewHeader } from "@/components/MarketOverviewHeader";
 import { IntelligenceSidebar } from "@/components/IntelligenceSidebar";
 import { WelcomeBanner } from "@/components/WelcomeBanner";
 import { BreakingNewsStrip } from "@/components/BreakingNewsStrip";
+import { CommandPalette } from "@/components/CommandPalette";
+import { StatusBar } from "@/components/StatusBar";
+import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
 import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
@@ -59,12 +62,61 @@ const EMPTY: DashboardData = {
   companies: [],
 };
 
+function scrollToAnchor(anchor: string) {
+  if (typeof window === "undefined") return;
+  const el = document.getElementById(anchor);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function openPaletteImperative() {
+  // The CommandPalette toggles on Cmd+K via the global hotkey hub.
+  // Synthesizing the event keeps the palette's state ownership in
+  // one place.
+  if (typeof window === "undefined") return;
+  const isMac = /Mac/i.test(navigator.platform);
+  const ev = new KeyboardEvent("keydown", {
+    key: "k",
+    metaKey: isMac,
+    ctrlKey: !isMac,
+    bubbles: true,
+  });
+  document.dispatchEvent(ev);
+}
+
+const SIGNAL_TYPE_LABELS: Array<{ id: string; label: string }> = [
+  { id: "mna_buy", label: "M&A · Acquirer" },
+  { id: "mna_sell", label: "M&A · Target" },
+  { id: "funding_grant", label: "Funding / Grant" },
+  { id: "job_spike", label: "Hiring spike" },
+  { id: "employee_growth", label: "Headcount growth" },
+  { id: "location_expansion", label: "Expansion" },
+  { id: "new_business_unit", label: "New BU" },
+  { id: "product_launch", label: "Product launch" },
+  { id: "patent_filing", label: "Patent filing" },
+  { id: "gf_change", label: "Leadership change" },
+  { id: "restructuring", label: "Restructuring" },
+  { id: "insolvency", label: "Insolvency" },
+];
+
+const SECTION_TARGETS: Array<{ id: string; label: string; anchor: string }> = [
+  { id: "sectors", label: "Sector Trends", anchor: "section-overview" },
+  { id: "regions", label: "Region Pulse", anchor: "section-sectors" },
+  { id: "clusters", label: "Cluster Heatmap", anchor: "section-regions" },
+  { id: "filter", label: "Filter Console", anchor: "section-clusters" },
+  { id: "companies", label: "Company Radar", anchor: "section-companies" },
+  { id: "forecast", label: "Forecast", anchor: "section-forecast" },
+  { id: "timeline", label: "Signal Timeline", anchor: "section-timeline" },
+];
+
 export default function DashboardPage() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const user = useMemo(() => getSessionUser(), []);
   const sourcesOnline = useMemo(
     () => DATA_SOURCES.filter((s) => s.status === "live").length,
@@ -75,6 +127,7 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      const t0 = performance.now();
       try {
         const [overview, sectors, regions, clusters, aggregates] =
           await Promise.all([
@@ -92,6 +145,8 @@ export default function DashboardPage() {
             ? prev
             : companies[0]?.id ?? null
         );
+        setLatencyMs(performance.now() - t0);
+        setLastSyncAt(new Date().toISOString());
         setError(null);
       } catch (err) {
         if (!cancelled) {
@@ -105,6 +160,14 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  // Bloomberg-style chord navigation
+  useChord("g s", () => scrollToAnchor("section-overview"));
+  useChord("g r", () => scrollToAnchor("section-sectors"));
+  useChord("g c", () => scrollToAnchor("section-regions"));
+  useChord("g co", () => scrollToAnchor("section-companies"));
+  useChord("g f", () => scrollToAnchor("section-forecast"));
+  useChord("g t", () => scrollToAnchor("section-timeline"));
 
   const sectorOptions = useMemo(
     () => data.sectors.map((s) => s.sector),
@@ -150,7 +213,15 @@ export default function DashboardPage() {
       <div className="pointer-events-none fixed inset-0 bg-grid bg-grid-fade opacity-40" />
 
       <div className="relative flex min-h-screen">
-        <IntelligenceSidebar user={user} />
+        <IntelligenceSidebar
+          user={user}
+          companies={data.companies}
+          onSelectCompany={(id) => {
+            setSelectedId(id);
+            scrollToAnchor("section-companies");
+          }}
+          onOpenPalette={openPaletteImperative}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col">
           {data.overview ? (
@@ -305,8 +376,32 @@ export default function DashboardPage() {
               </span>
             </footer>
           </main>
+
+          <StatusBar
+            latencyMs={latencyMs}
+            lastSyncAt={lastSyncAt}
+            apiOk={!error}
+          />
         </div>
       </div>
+
+      <CommandPalette
+        companies={data.companies}
+        sections={SECTION_TARGETS}
+        signalTypes={SIGNAL_TYPE_LABELS}
+        onSelectCompany={(id) => {
+          setSelectedId(id);
+          scrollToAnchor("section-companies");
+        }}
+        onJumpToAnchor={(anchor) => scrollToAnchor(anchor)}
+        onFilterBySignal={(signalType) => {
+          setFilters((f) => ({
+            ...f,
+            category: signalType as FilterState["category"],
+          }));
+          scrollToAnchor("section-clusters");
+        }}
+      />
     </div>
   );
 }
