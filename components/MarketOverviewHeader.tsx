@@ -9,6 +9,23 @@ import {
 import type { SessionUser } from "@/lib/session";
 import { AnimatedNumber } from "./AnimatedNumber";
 
+/**
+ * Open the command palette by synthesizing the same ⌘K / Ctrl-K
+ * keypress the global hotkey hub already listens for. Used by the
+ * header search button so a tap on mobile (no keyboard) still works.
+ */
+function openSearchPalette(): void {
+  if (typeof window === "undefined") return;
+  const isMac = /Mac/i.test(navigator.platform);
+  const ev = new KeyboardEvent("keydown", {
+    key: "k",
+    metaKey: isMac,
+    ctrlKey: !isMac,
+    bubbles: true,
+  });
+  document.dispatchEvent(ev);
+}
+
 interface MarketOverviewHeaderProps {
   overview: MarketOverview;
   user: SessionUser;
@@ -53,7 +70,13 @@ export function MarketOverviewHeader({
             value={t.label.toUpperCase()}
             tone={temp === "overheated" ? "violet" : "cyan"}
           />
-          <button className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">
+          <button
+            type="button"
+            onClick={openSearchPalette}
+            className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:border-accent-cyan/40 hover:text-accent-cyan"
+            title="Open search (⌘K)"
+            aria-label="Open search palette"
+          >
             ⌘K · Search
           </button>
           <a
