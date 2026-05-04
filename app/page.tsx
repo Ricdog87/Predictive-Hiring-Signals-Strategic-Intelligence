@@ -8,6 +8,9 @@ import { BreakingNewsStrip } from "@/components/BreakingNewsStrip";
 import { CommandPalette } from "@/components/CommandPalette";
 import { StatusBar } from "@/components/StatusBar";
 import { GermanyRegionPanel } from "@/components/GermanyRegionPanel";
+import { MacroStrip } from "@/components/MacroStrip";
+import { JobMarketPanel } from "@/components/JobMarketPanel";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
@@ -240,7 +243,13 @@ export default function DashboardPage() {
             totalSources={DATA_SOURCES.length}
           />
 
-          <BreakingNewsStrip />
+          <ErrorBoundary section="Macro Strip">
+            <MacroStrip />
+          </ErrorBoundary>
+
+          <ErrorBoundary section="Wire Feed">
+            <BreakingNewsStrip />
+          </ErrorBoundary>
 
           <main className="flex-1 px-5 py-6">
             {error && (
@@ -281,7 +290,9 @@ export default function DashboardPage() {
                 title="Hiring Heat · Nord · Ost · Süd · West"
                 hint="GET /api/regions/de · 16 Bundesländer · Eurostat overlay · Sonar live insight"
               />
-              <GermanyRegionPanel />
+              <ErrorBoundary section="Germany Quadrants">
+                <GermanyRegionPanel />
+              </ErrorBoundary>
             </section>
 
             <section id="section-regions" className="mt-8 scroll-mt-24">
@@ -299,6 +310,17 @@ export default function DashboardPage() {
                   regions={regionOptions}
                 />
               )}
+            </section>
+
+            <section id="section-jobmarket" className="mt-8 scroll-mt-24">
+              <SectionTitle
+                eyebrow="Job Market"
+                title="DE Job-Posting Pulse · Adzuna"
+                hint="GET /api/jobmarket/pulse · live · 12 Kategorien · refresh 30 min"
+              />
+              <ErrorBoundary section="Job Market">
+                <JobMarketPanel />
+              </ErrorBoundary>
             </section>
 
             <section id="section-clusters" className="mt-8 scroll-mt-24">

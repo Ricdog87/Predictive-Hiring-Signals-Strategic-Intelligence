@@ -52,6 +52,7 @@ export const PRIMARY_NAV: NavSection[] = [
   { id: "sectors", label: "Sector Trends", glyph: "▤", anchor: "section-sectors" },
   { id: "regions", label: "Region Trends", glyph: "◬", anchor: "section-regions" },
   { id: "de-regions", label: "DE · Quadranten", glyph: "🇩🇪", anchor: "section-de-regions" },
+  { id: "jobmarket", label: "Job Market", glyph: "⊞", anchor: "section-jobmarket" },
   { id: "clusters", label: "Cluster Heatmap", glyph: "▦", anchor: "section-clusters" },
   { id: "companies", label: "Companies", glyph: "◫", anchor: "section-companies" },
   { id: "forecast", label: "Forecast", glyph: "ℙ", anchor: "section-forecast" },

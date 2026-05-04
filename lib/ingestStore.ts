@@ -132,33 +132,93 @@ export async function appendIngest(
     receivedAt: new Date().toISOString(),
   };
 
+  // Storage tier order: Supabase → Vercel KV → in-memory ring buffer.
+  // Each tier writes through to the next layer on failure, so a signal
+  // is never lost when the upstream layer is down.
+  try {
+    const { isSupabaseConfigured, persistIngestRecord } = await import(
+      './supabaseStore'
+    );
+    if (isSupabaseConfigured()) {
+      const r = await persistIngestRecord(record);
+      if (r.ok) {
+        // Mirror to memory so reads inside the same warm lambda stay fast.
+        upsertMemory(record);
+        return record;
+      }
+      // eslint-disable-next-line no-console
+      console.warn('[ingestStore] supabase write failed, falling back', r.reason);
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[ingestStore] supabase module load failed', (err as Error).message);
+  }
+
   if (useKv) {
     try {
       await kvCmd('LPUSH', KV_KEY, JSON.stringify(record));
       await kvCmd('LTRIM', KV_KEY, 0, MAX_RECORDS - 1);
+      upsertMemory(record);
       return record;
     } catch (err) {
-      // KV failure should not lose the signal; fall through to memory
+      // eslint-disable-next-line no-console
       console.error('[ingestStore] KV append failed, using memory', err);
     }
   }
 
+  upsertMemory(record);
+  return record;
+}
+
+function upsertMemory(record: IngestRecord): void {
   const exists = memory.records.findIndex((r) => r.id === record.id);
   if (exists >= 0) memory.records.splice(exists, 1);
   memory.records.unshift(record);
   if (memory.records.length > MAX_RECORDS) {
     memory.records.length = MAX_RECORDS;
   }
-  return record;
 }
 
 export async function listIngest(limit = 200): Promise<IngestRecord[]> {
   const cap = Math.max(1, Math.min(MAX_RECORDS, limit));
+
+  // Try Supabase first when configured. Memory still holds warm-lambda
+  // writes so we union the two — Supabase rows take precedence on id.
+  try {
+    const { isSupabaseConfigured, listPersistedIngest } = await import(
+      './supabaseStore'
+    );
+    if (isSupabaseConfigured()) {
+      const r = await listPersistedIngest(cap);
+      if (r.ok) {
+        const seen = new Set(r.data.map((x) => x.id));
+        const merged = [...r.data];
+        for (const m of memory.records) {
+          if (seen.has(m.id)) continue;
+          merged.push(m);
+        }
+        return merged
+          .sort(
+            (a, b) =>
+              new Date(b.receivedAt).getTime() -
+              new Date(a.receivedAt).getTime()
+          )
+          .slice(0, cap);
+      }
+      // eslint-disable-next-line no-console
+      console.warn('[ingestStore] supabase read failed, falling back', r.reason);
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[ingestStore] supabase module load failed', (err as Error).message);
+  }
+
   if (useKv) {
     try {
       const raw = await kvCmd<string[]>('LRANGE', KV_KEY, 0, cap - 1);
       return (raw ?? []).map((s) => JSON.parse(s) as IngestRecord);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('[ingestStore] KV read failed, using memory', err);
     }
   }
@@ -212,4 +272,15 @@ function flattenMeta(
 
 export function isIngestStoreUsingKv(): boolean {
   return useKv;
+}
+
+/**
+ * Coarse storage-tier label used by /api/ingest responses + /api/health.
+ * Reads env directly to avoid an async module load.
+ */
+export function ingestStoreTier(): 'supabase' | 'kv' | 'memory' {
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return 'supabase';
+  }
+  return useKv ? 'kv' : 'memory';
 }
