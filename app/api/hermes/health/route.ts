@@ -10,7 +10,7 @@ export async function GET() {
         ok: false,
         configured: false,
         reason: 'unconfigured',
-        detail: 'HERMES_BASE_URL not set on the radar',
+        detail: 'RSG Intelligence Engine not configured',
         generatedAt: new Date().toISOString(),
       },
       { status: 200 }

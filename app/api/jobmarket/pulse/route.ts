@@ -9,7 +9,7 @@ export async function GET() {
       ok: false,
       configured: false,
       reason: 'unconfigured',
-      detail: 'ADZUNA_APP_ID / ADZUNA_APP_KEY not set on the radar',
+      detail: 'Job-Market source not configured',
       generatedAt: new Date().toISOString(),
     });
   }

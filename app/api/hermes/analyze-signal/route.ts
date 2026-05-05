@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         ok: false,
         fellBack: true,
         reason: 'unconfigured',
-        detail: 'HERMES_BASE_URL not set on the radar',
+        detail: 'RSG Intelligence Engine not configured',
       },
       { status: 200 }
     );

@@ -87,8 +87,8 @@ export async function GET() {
       primary: '🇩🇪 ARBEITSLOSENQUOTE',
       delta: `${unemployment.data.rate.toFixed(1)}%`,
       tone: 'flat',
-      detail: `Eurostat · ${unemployment.data.period}`,
-      source: 'eurostat',
+      detail: `Statistisches Amt · ${unemployment.data.period}`,
+      source: 'macro',
     });
   }
 

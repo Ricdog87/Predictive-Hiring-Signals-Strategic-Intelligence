@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         fellBack: true,
         reason: 'unconfigured',
         detail:
-          'HERMES_BASE_URL not set on the radar — daily brief will activate as soon as Hermes is reachable.',
+          'RSG Intelligence Engine not configured — daily brief will activate once available.',
         generatedAt: new Date().toISOString(),
       },
       { status: 200 }
