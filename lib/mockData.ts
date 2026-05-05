@@ -1,33 +1,29 @@
 /**
- * Data composition layer · v3 (live-news-first).
+ * Data composition layer · v4 (live + discovery).
  *
- * Three sources of CompanySignal, in priority order:
+ * Four sources of CompanySignal, in priority order:
  *
- *   1. `fetchAllNews()` + `classifyNewsBatch()` — live RSS-classified
- *      DACH business news (Tagesschau, Spiegel, manager-magazin, …).
- *      Real companies, real signals, fresh from the wire.
+ *   1. `fetchAllNews()` + `classifyNewsBatch()` — RSS-classified DACH
+ *      business news. Real but limited to what flows through fixed feeds.
  *
- *   2. `listIngest()` — ingest_store records (n8n pipeline / manual
- *      `/api/ingest` POSTs). Supabase-backed when configured, in-memory
- *      otherwise.
+ *   2. `getDiscoveredSignals()` — NEW. Calls Hermes
+ *      `/discover-dach-signals` which uses OpenRouter live tier
+ *      (gpt-4o-mini:online) to actively scan the web for current
+ *      DACH hiring signals. Returns 10–30 fresh structured signals
+ *      per call. Cached in-process for ~10 min.
  *
- *   3. `runIngestionPipeline()` — adapter-driven seed (Adzuna /
- *      Bundesanzeiger / etc. scaffolds). Demo data ONLY — used as
- *      fallback when the live pipelines are sparse.
+ *   3. `listIngest()` — n8n / manual `/api/ingest` POSTs.
  *
- * Mode controlled by `RSG_DATA_MODE` env var (set in Vercel Project
- * Settings → Environment Variables):
+ *   4. `runIngestionPipeline()` — adapter-driven seed (mock companies).
+ *      Demo data ONLY — auto-suppressed when liveCount >= 5.
  *
- *   - 'auto' (default)   → live + adapter, but adapter is auto-
- *                          suppressed when liveCount >= 5. Production-clean.
- *   - 'live_only'        → live news + ingest only. Never adapter mocks.
- *   - 'with_adapter'     → always include adapter (legacy / debugging).
+ * Mode controlled by `RSG_DATA_MODE` env var:
+ *   - 'auto' (default)   → all live sources + adapter as fallback
+ *   - 'live_only'        → news + discovery + ingest. Never adapter.
+ *   - 'with_adapter'     → always include adapter (legacy / debug).
  *
- * The scoring engine downstream (`scoring.ts`) is signal-source-agnostic:
- * it computes the same hiring-score regardless of where the signal came
- * from. So switching to live-only flips the dashboard KPIs (TOTAL
- * SIGNALS, HIGH-PROB COMPANIES, AVG HIRING SCORE, POSITIVE GROWTH /
- * NEGATIVE RISK counts) onto real DACH companies automatically.
+ * Discovery is gated by `RSG_DISCOVERY_ENABLED` (default 'true').
+ * Set 'false' to skip the Hermes call entirely (e.g. if budget caps).
  */
 
 import { runIngestionPipeline } from '../src/pipeline/runIngestion';
@@ -44,6 +40,14 @@ const ADAPTER_SUPPRESS_THRESHOLD = Number(
   process.env.RSG_ADAPTER_SUPPRESS_THRESHOLD ?? 5
 );
 
+const DISCOVERY_ENABLED =
+  (process.env.RSG_DISCOVERY_ENABLED ?? 'true').toLowerCase() !== 'false';
+const DISCOVERY_MAX_SIGNALS = Number(process.env.RSG_DISCOVERY_MAX ?? 25);
+const DISCOVERY_CACHE_MS = Number(process.env.RSG_DISCOVERY_CACHE_MS ?? 600_000); // 10 min
+const DISCOVERY_TIMEOUT_MS = Number(
+  process.env.RSG_DISCOVERY_TIMEOUT_MS ?? 60_000
+);
+
 function resolveDataMode(): DataMode {
   const raw = (process.env.RSG_DATA_MODE ?? '').toLowerCase().trim();
   if (raw === 'live_only') return 'live_only';
@@ -55,7 +59,6 @@ function resolveDataMode(): DataMode {
 // News → CompanySignal
 // -----------------------------------------------------------------------------
 
-/** Stable id for a news-derived signal — survives re-classification. */
 function newsSignalId(item: ClassifiedNewsItem): string {
   const base = `${item.link || item.title}|${item.signalType}`;
   let hash = 0;
@@ -100,6 +103,154 @@ async function getNewsSignals(): Promise<CompanySignal[]> {
     console.error('[mockData] news pipeline failed', err);
     return [];
   }
+}
+
+// -----------------------------------------------------------------------------
+// Hermes Live-Discovery → CompanySignal
+// -----------------------------------------------------------------------------
+
+interface DiscoveredSignal {
+  companyName: string;
+  sector: string;
+  headquarters: string;
+  region: string;
+  bundesland?: string;
+  signalType: CompanySignal['signalType'];
+  title: string;
+  description: string;
+  source: string;
+  sourceUrl?: string;
+  impact: number;
+  confidence: number;
+  publishedAt: string;
+}
+
+interface DiscoveryEnvelope {
+  ok: boolean;
+  signals?: DiscoveredSignal[];
+  rawCount?: number;
+  validatedCount?: number;
+  generatedAt?: string;
+  error?: string;
+}
+
+interface CacheEntry {
+  data: CompanySignal[];
+  expiresAt: number;
+  fetchedAt: number;
+}
+
+const globalForDiscovery = globalThis as unknown as {
+  __rsgDiscoveryCache?: CacheEntry;
+};
+
+function discoverySignalId(s: DiscoveredSignal): string {
+  const base = `${s.companyName}|${s.signalType}|${s.publishedAt || ''}`;
+  let hash = 0;
+  for (let i = 0; i < base.length; i++) {
+    hash = ((hash << 5) - hash + base.charCodeAt(i)) | 0;
+  }
+  return `disc_${Math.abs(hash).toString(36)}`;
+}
+
+function discoveryToSignal(s: DiscoveredSignal): CompanySignal {
+  const resolved = resolveCompany(s.companyName);
+  const observedAt =
+    s.publishedAt && !Number.isNaN(Date.parse(s.publishedAt))
+      ? new Date(s.publishedAt).toISOString()
+      : new Date().toISOString();
+  return {
+    id: discoverySignalId(s),
+    companyId: resolved.companyId,
+    provider: 'discovery_dach',
+    signalType: s.signalType,
+    impact: s.impact,
+    confidence: s.confidence,
+    observedAt,
+    meta: {
+      companyName: resolved.companyName,
+      title: s.title || '',
+      description: (s.description || '').slice(0, 240),
+      source: s.source || '',
+      link: s.sourceUrl || '',
+      industry: s.sector || '',
+      region: s.region || '',
+      bundesland: s.bundesland ?? '',
+      headquarters: s.headquarters || '',
+    },
+  };
+}
+
+async function callHermesDiscovery(): Promise<CompanySignal[]> {
+  const baseUrl = process.env.HERMES_BASE_URL?.trim();
+  const apiKey = process.env.HERMES_API_KEY?.trim();
+  if (!baseUrl || !apiKey) {
+    return [];
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DISCOVERY_TIMEOUT_MS);
+  try {
+    const res = await fetch(
+      `${baseUrl.replace(/\/+$/, '')}/discover-dach-signals`,
+      {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          market: 'DACH',
+          maxSignals: DISCOVERY_MAX_SIGNALS,
+        }),
+        cache: 'no-store',
+      }
+    );
+    if (!res.ok) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mockData] discovery HTTP ${res.status}: ${(await res
+          .text()
+          .catch(() => ''))
+          .slice(0, 200)}`
+      );
+      return [];
+    }
+    const body = (await res.json()) as DiscoveryEnvelope;
+    if (!body.ok || !Array.isArray(body.signals)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mockData] discovery ok=false: ${body.error ?? 'unknown'}`
+      );
+      return [];
+    }
+    return body.signals.map(discoveryToSignal);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[mockData] discovery call failed',
+      (err as Error).message
+    );
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function getDiscoveredSignals(): Promise<CompanySignal[]> {
+  if (!DISCOVERY_ENABLED) return [];
+  const now = Date.now();
+  const cached = globalForDiscovery.__rsgDiscoveryCache;
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+  const fresh = await callHermesDiscovery();
+  globalForDiscovery.__rsgDiscoveryCache = {
+    data: fresh,
+    expiresAt: now + DISCOVERY_CACHE_MS,
+    fetchedAt: now,
+  };
+  return fresh;
 }
 
 // -----------------------------------------------------------------------------
@@ -156,14 +307,15 @@ async function getAdapterSignals(): Promise<CompanySignal[]> {
 export async function getSignals(): Promise<CompanySignal[]> {
   const mode = resolveDataMode();
 
-  // Live sources always run.
-  const [newsSignals, ingestSignals] = await Promise.all([
+  // Live sources run in parallel.
+  const [newsSignals, discoverySignals, ingestSignals] = await Promise.all([
     getNewsSignals(),
+    getDiscoveredSignals(),
     getIngestSignals(),
   ]);
-  const liveCount = newsSignals.length + ingestSignals.length;
+  const liveCount =
+    newsSignals.length + discoverySignals.length + ingestSignals.length;
 
-  // Adapter inclusion logic.
   let adapterSignals: CompanySignal[] = [];
   const includeAdapter =
     mode === 'with_adapter' ||
@@ -172,10 +324,15 @@ export async function getSignals(): Promise<CompanySignal[]> {
     adapterSignals = await getAdapterSignals();
   }
 
-  // De-dup by id; live signals win.
   const seen = new Set<string>();
   const merged: CompanySignal[] = [];
-  for (const sig of [...newsSignals, ...ingestSignals, ...adapterSignals]) {
+  // Priority: news > discovery > ingest > adapter
+  for (const sig of [
+    ...newsSignals,
+    ...discoverySignals,
+    ...ingestSignals,
+    ...adapterSignals,
+  ]) {
     if (seen.has(sig.id)) continue;
     seen.add(sig.id);
     merged.push(sig);
@@ -228,27 +385,39 @@ export async function getAggregates(): Promise<CompanyAggregate[]> {
 export async function describeDataPath(): Promise<{
   mode: DataMode;
   news: number;
+  discovery: number;
   ingest: number;
   adapter: number;
   effectivePath: string;
+  discoveryEnabled: boolean;
+  discoveryCacheAgeSec: number | null;
 }> {
   const mode = resolveDataMode();
-  const [newsSignals, ingestSignals] = await Promise.all([
+  const [newsSignals, discoverySignals, ingestSignals] = await Promise.all([
     getNewsSignals(),
+    getDiscoveredSignals(),
     getIngestSignals(),
   ]);
-  const liveCount = newsSignals.length + ingestSignals.length;
+  const liveCount =
+    newsSignals.length + discoverySignals.length + ingestSignals.length;
   const includeAdapter =
     mode === 'with_adapter' ||
     (mode === 'auto' && liveCount < ADAPTER_SUPPRESS_THRESHOLD);
   const adapterCount = includeAdapter ? (await getAdapterSignals()).length : 0;
+
+  const cache = globalForDiscovery.__rsgDiscoveryCache;
+  const cacheAge = cache ? Math.round((Date.now() - cache.fetchedAt) / 1000) : null;
+
   return {
     mode,
     news: newsSignals.length,
+    discovery: discoverySignals.length,
     ingest: ingestSignals.length,
     adapter: adapterCount,
     effectivePath: includeAdapter
-      ? `live + adapter (live=${liveCount}, adapter=${adapterCount})`
-      : `live only (n=${liveCount}, adapter suppressed)`,
+      ? `news=${newsSignals.length} discovery=${discoverySignals.length} ingest=${ingestSignals.length} adapter=${adapterCount}`
+      : `news=${newsSignals.length} discovery=${discoverySignals.length} ingest=${ingestSignals.length} (adapter suppressed, live=${liveCount})`,
+    discoveryEnabled: DISCOVERY_ENABLED,
+    discoveryCacheAgeSec: cacheAge,
   };
 }
