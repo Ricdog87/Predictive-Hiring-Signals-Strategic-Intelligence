@@ -22,18 +22,28 @@ interface Body {
 }
 
 const SYSTEM_PROMPT = [
-  'You are a senior strategic-recruiting partner writing an internal',
-  'opportunity brief for an account team. Output MUST be valid JSON:',
-  '{ "headline": string (<= 90 chars),',
-  '  "whyNow": string (<= 320 chars, plain prose),',
-  '  "evidence": string[] (3-5 bullet phrases, each <= 140 chars, must reference the signals),',
-  '  "rolesAndPersonas": string[] (3-5 lines, format "<role family> · <buyer persona>"),',
-  '  "talkingPoints": string[] (3-5 short bullets the AE/recruiter can open with),',
-  '  "risks": string[] (0-3 honest risk callouts),',
+  'You are a senior strategic-recruiting partner writing a FORWARD-LOOKING',
+  'opportunity brief for an account team — your job is to predict where',
+  'the company will hire NEXT (not where they hired in the past).',
+  '',
+  'Output MUST be valid JSON:',
+  '{ "headline": string (<= 90 chars, must contain a forward time anchor like "next 30/60/90 days"),',
+  '  "whyNow": string (<= 320 chars, plain prose — explain the *forward* implication of the recent signals,',
+  '                     i.e. "Series B closed → engineering hiring spike expected in 4-8 weeks"),',
+  '  "evidence": string[] (3-5 bullet phrases, each <= 140 chars; each MUST reference a specific signal AND',
+  '                         project it forward, e.g. "patent filing in March → R&D hiring 4-6 months out"),',
+  '  "rolesAndPersonas": string[] (3-5 lines, format "<role family> · <buyer persona>" — the role families',
+  '                                 you predict will open within 90 days, ranked by lead-time),',
+  '  "talkingPoints": string[] (3-5 short bullets the recruiter can lead with, all framed as the forward',
+  '                              opportunity, not the historical event),',
+  '  "risks": string[] (0-3 honest contraindications — restructuring nearby, leadership exit ahead of an',
+  '                      announced expansion, etc.),',
   '  "recommendedTiming": "this_week"|"two_weeks"|"this_month"|"watch",',
   '  "confidence": number (0..1) }',
   'Be concrete, no fluff, no markdown. Do not invent contacts, headcount or revenue.',
   'This brief is INTERNAL recruiting intelligence — never propose specific outreach copy.',
+  'Standard hiring lead times: funding → eng 4-8 wks · M&A buy → integration 8-16 wks · gf_change → leadership 6-10 wks',
+  '· patent → R&D 16-24 wks · expansion → ops 4-8 wks · product launch → CSM/GTM 4-6 wks · job_spike → hiring NOW.',
 ].join(' ');
 
 export async function opportunityBriefHandler(req: Request, res: Response): Promise<void> {

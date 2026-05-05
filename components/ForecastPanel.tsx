@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { CompanyView, ForecastBand } from "@/lib/marketView";
+import type { CompanyForecast } from "@/lib/hiringForecast";
 import { forecastStyles } from "@/lib/format";
+import { signalTypeShortLabel } from "@/lib/marketIntelligence";
 import { PanelEmpty } from "./EmptyStates";
 
 interface ForecastPanelProps {
@@ -15,7 +18,7 @@ export function ForecastPanel({ company }: ForecastPanelProps) {
         <div className="flex items-center gap-3">
           <span className="label-eyebrow">Forecast · Predicted Role Clusters</span>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            from /api/company/[id] · Codex engine
+            RSG Engine · forecast band · role clusters
           </span>
         </div>
         <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
@@ -43,6 +46,7 @@ function ForecastContent({ company }: { company: CompanyView }) {
       ? Math.max(8, Math.round((company.hiringProbability / 100) * 24))
       : 0;
   const palette = ["#0E6B85", "#6D4FC4", "#3A8841", "#B07C12", "#1F7E96"];
+  const forward = useForwardForecast(company.id);
   const shares = clusters.length === 0
     ? []
     : clusters.map((_, i) => 1 / clusters.length + ((i % 2 === 0 ? 0.05 : -0.05) / clusters.length));
@@ -107,7 +111,7 @@ function ForecastContent({ company }: { company: CompanyView }) {
         <div className="flex items-center justify-between">
           <div className="label-eyebrow">Predicted Role Clusters</div>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            from latestPrediction.expectedRoleClusters
+            RSG Engine · predicted
           </span>
         </div>
 
@@ -172,8 +176,177 @@ function ForecastContent({ company }: { company: CompanyView }) {
             </div>
           </>
         )}
+
+        <ForwardForecast forecast={forward} />
       </div>
     </div>
+  );
+}
+
+function useForwardForecast(companyId: string): CompanyForecast | null {
+  const [data, setData] = useState<CompanyForecast | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/forecast/company/${encodeURIComponent(companyId)}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) return;
+        const j = (await res.json()) as { ok: boolean; forecast?: CompanyForecast };
+        if (!cancelled && j.ok && j.forecast) {
+          setData(j.forecast);
+        }
+      } catch {
+        // silent — Forward Forecast is supplementary
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+  return data;
+}
+
+const POSTURE_TONE: Record<string, { fg: string; ring: string; bg: string; label: string }> = {
+  expanding:     { fg: "text-accent-green",  ring: "ring-accent-green/40",  bg: "bg-accent-green/10",  label: "Expanding"     },
+  exploring:     { fg: "text-accent-cyan",   ring: "ring-accent-cyan/40",   bg: "bg-accent-cyan/10",   label: "Exploring"     },
+  consolidating: { fg: "text-accent-amber",  ring: "ring-accent-amber/40",  bg: "bg-accent-amber/10",  label: "Consolidating" },
+  contracting:   { fg: "text-accent-red",    ring: "ring-accent-red/40",    bg: "bg-accent-red/10",    label: "Contracting"   },
+  unknown:       { fg: "text-text-muted",    ring: "ring-bg-rule",          bg: "bg-bg-elevated",      label: "—"             },
+};
+
+function ForwardForecast({ forecast }: { forecast: CompanyForecast | null }) {
+  if (!forecast) return null;
+  const top = forecast.byFamily.slice(0, 5);
+  if (top.length === 0) return null;
+  const posture = POSTURE_TONE[forecast.posture] ?? POSTURE_TONE.unknown;
+  return (
+    <div className="mt-6 border-t border-bg-border pt-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="label-eyebrow">Forward Forecast · 30 / 60 / 90 / 180 d</div>
+          <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
+            RSG Engine · forward forecast
+          </span>
+        </div>
+        <span className={`chip ${posture.fg} ${posture.ring} ${posture.bg}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${posture.fg.replace('text-', 'bg-')}`} />
+          {posture.label}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-baseline gap-4 font-mono text-2xs uppercase tracking-wider text-text-muted">
+        <span>
+          forward score{' '}
+          <span className="num text-accent-cyan">{forecast.forwardScore.toFixed(1)}</span>
+        </span>
+        <span className="text-text-faint">·</span>
+        <span>
+          confidence{' '}
+          <span className="num text-text-secondary">
+            {Math.round(forecast.forecastConfidence * 100)}%
+          </span>
+        </span>
+        <span className="text-text-faint">·</span>
+        <span>
+          drivers{' '}
+          {forecast.topDrivers.length === 0 ? (
+            <span className="text-text-faint">—</span>
+          ) : (
+            forecast.topDrivers.map((d) => (
+              <span key={d} className="ml-1 text-text-secondary">
+                {signalTypeShortLabel(d)}
+              </span>
+            ))
+          )}
+        </span>
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-sm border border-bg-border">
+        <table className="min-w-full text-[12px]">
+          <thead>
+            <tr className="bg-bg-surface/40 text-left">
+              <Th>Role family</Th>
+              <Th align="right">30d</Th>
+              <Th align="right">60d</Th>
+              <Th align="right">90d</Th>
+              <Th align="right">180d</Th>
+              <Th align="right">Peak</Th>
+              <Th>Drivers</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {top.map((f) => (
+              <tr key={f.family} className="border-t border-bg-line/50">
+                <td className="px-3 py-1.5 align-middle">
+                  <span className="font-medium text-text-primary">{f.label}</span>
+                </td>
+                <ProbCell value={f.probability30} />
+                <ProbCell value={f.probability60} />
+                <ProbCell value={f.probability90} />
+                <ProbCell value={f.probability180} />
+                <td className="num px-3 py-1.5 text-right align-middle text-text-secondary">
+                  {f.peakDay}d
+                </td>
+                <td className="px-3 py-1.5 align-middle">
+                  <div className="flex flex-wrap gap-1">
+                    {f.drivingSignals.slice(0, 2).map((d) => (
+                      <span
+                        key={d}
+                        className="chip ring-bg-rule text-text-secondary bg-bg-surface/60"
+                      >
+                        {signalTypeShortLabel(d)}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ProbCell({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  const fg =
+    v >= 70 ? "text-accent-green" : v >= 45 ? "text-accent-cyan" : v >= 20 ? "text-text-secondary" : "text-text-muted";
+  const bar =
+    v >= 70 ? "bg-accent-green" : v >= 45 ? "bg-accent-cyan" : v >= 20 ? "bg-accent-violet" : "bg-text-muted";
+  return (
+    <td className="px-3 py-1.5 text-right align-middle">
+      <div className="flex items-center justify-end gap-2">
+        <div className="h-1 w-16 overflow-hidden rounded-full bg-bg-surface ring-1 ring-bg-border">
+          <div className={`h-full ${bar}`} style={{ width: `${v}%` }} />
+        </div>
+        <span className={`num text-[11.5px] font-semibold ${fg}`}>
+          {v.toFixed(0)}%
+        </span>
+      </div>
+    </td>
+  );
+}
+
+function Th({
+  children,
+  align = "left",
+}: {
+  children: React.ReactNode;
+  align?: "left" | "right";
+}) {
+  return (
+    <th
+      className={`label-eyebrow px-3 py-1.5 font-medium ${
+        align === "right" ? "text-right" : "text-left"
+      }`}
+    >
+      {children}
+    </th>
   );
 }
 

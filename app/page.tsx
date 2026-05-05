@@ -8,6 +8,11 @@ import { BreakingNewsStrip } from "@/components/BreakingNewsStrip";
 import { CommandPalette } from "@/components/CommandPalette";
 import { StatusBar } from "@/components/StatusBar";
 import { GermanyRegionPanel } from "@/components/GermanyRegionPanel";
+import { MacroStrip } from "@/components/MacroStrip";
+import { JobMarketPanel } from "@/components/JobMarketPanel";
+import { MorningBriefCard } from "@/components/MorningBriefCard";
+import { ResearchModal } from "@/components/ResearchModal";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
 import { CompanySignalTable } from "@/components/CompanySignalTable";
@@ -118,6 +123,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [researchQuery, setResearchQuery] = useState<string | null>(null);
   const user = useMemo(() => getSessionUser(), []);
   const sourcesOnline = useMemo(
     () => DATA_SOURCES.filter((s) => s.status === "live").length,
@@ -240,7 +246,22 @@ export default function DashboardPage() {
             totalSources={DATA_SOURCES.length}
           />
 
-          <BreakingNewsStrip />
+          <ErrorBoundary section="Morning Brief">
+            <MorningBriefCard
+              watchlistCompanies={data.companies.map((c) => ({
+                id: c.id,
+                name: c.name,
+              }))}
+            />
+          </ErrorBoundary>
+
+          <ErrorBoundary section="Macro Strip">
+            <MacroStrip />
+          </ErrorBoundary>
+
+          <ErrorBoundary section="Wire Feed">
+            <BreakingNewsStrip />
+          </ErrorBoundary>
 
           <main className="flex-1 px-5 py-6">
             {error && (
@@ -253,7 +274,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Sector Intelligence"
                 title="Sector Trends · Hottest sectors"
-                hint="GET /api/sectors · signal volume × momentum × confidence"
+                hint="signal volume × momentum × confidence"
               />
               {loading && data.sectors.length === 0 ? (
                 <KpiSkeleton />
@@ -266,7 +287,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Region Intelligence"
                 title="Regional Hiring Pulse"
-                hint="GET /api/regions · dominant sectors · DE focus"
+                hint="dominant sectors · DE focus"
               />
               {loading && data.regions.length === 0 ? (
                 <KpiSkeleton />
@@ -279,16 +300,18 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Deutschland · Quadranten"
                 title="Hiring Heat · Nord · Ost · Süd · West"
-                hint="GET /api/regions/de · 16 Bundesländer · Eurostat overlay · Sonar live insight"
+                hint="16 Bundesländer · live macro overlay · RSG Live Intel"
               />
-              <GermanyRegionPanel />
+              <ErrorBoundary section="Germany Quadrants">
+                <GermanyRegionPanel />
+              </ErrorBoundary>
             </section>
 
             <section id="section-regions" className="mt-8 scroll-mt-24">
               <SectionTitle
                 eyebrow="Clusters"
                 title="Sector × Region Heatmap"
-                hint="GET /api/clusters · opportunity / risk / dominant signals"
+                hint="opportunity / risk / dominant signals"
               />
               {loading && data.clusters.length === 0 ? (
                 <KpiSkeleton />
@@ -299,6 +322,17 @@ export default function DashboardPage() {
                   regions={regionOptions}
                 />
               )}
+            </section>
+
+            <section id="section-jobmarket" className="mt-8 scroll-mt-24">
+              <SectionTitle
+                eyebrow="Job Market"
+                title="DE Job-Posting Pulse"
+                hint="live · 12 Kategorien · refresh 30 min"
+              />
+              <ErrorBoundary section="Job Market">
+                <JobMarketPanel />
+              </ErrorBoundary>
             </section>
 
             <section id="section-clusters" className="mt-8 scroll-mt-24">
@@ -326,7 +360,7 @@ export default function DashboardPage() {
                   <SectionTitle
                     eyebrow="Companies"
                     title="Company Signal Radar"
-                    hint="GET /api/companies + /api/company/[id] · click to inspect"
+                    hint="click to inspect"
                   />
                   {loading && data.companies.length === 0 ? (
                     <TableSkeleton />
@@ -363,7 +397,7 @@ export default function DashboardPage() {
               <SectionTitle
                 eyebrow="Forecast"
                 title="Predicted Role Clusters · Forecast Window"
-                hint="from /api/company/[id].latestPrediction"
+                hint="RSG Engine · forward forecast"
               />
               <ForecastPanel company={selected} />
             </section>
@@ -381,8 +415,24 @@ export default function DashboardPage() {
               <span>
                 RSG · Market Intelligence Terminal · DE / DACH focus
               </span>
-              <span className="text-text-faint">
-                v1.0 · Codex backend · live API · read-only intelligence
+              <span className="flex items-center gap-3">
+                <a
+                  href="/impressum"
+                  className="hover:text-accent-cyan"
+                >
+                  Impressum
+                </a>
+                <span className="text-text-faint">·</span>
+                <a
+                  href="/datenschutz"
+                  className="hover:text-accent-cyan"
+                >
+                  Datenschutz
+                </a>
+                <span className="text-text-faint">·</span>
+                <span className="text-text-faint">
+                  v1.0 · RSG Engine · live
+                </span>
               </span>
             </footer>
           </main>
@@ -411,7 +461,10 @@ export default function DashboardPage() {
           }));
           scrollToAnchor("section-clusters");
         }}
+        onResearchCompany={(query) => setResearchQuery(query)}
       />
+
+      <ResearchModal query={researchQuery} onClose={() => setResearchQuery(null)} />
     </div>
   );
 }

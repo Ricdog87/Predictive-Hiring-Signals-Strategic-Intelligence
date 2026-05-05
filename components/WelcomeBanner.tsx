@@ -16,7 +16,7 @@ const BOOT_LINES = [
   "kernel · ingestion-pipeline ............. ok",
   "adapter · bundesanzeiger ................ live",
   "adapter · handelsregister ............... live",
-  "engine  · codex / market-intelligence ... ok",
+  "engine  · rsg / market-intelligence ..... ok",
   "engine  · scoring v2.1.0 ................ ok",
   "feed    · ticker bound .................. ok",
 ];
@@ -109,7 +109,7 @@ export function WelcomeBanner({
               {sourcesOnline}/{totalSources} feeds streaming
             </span>
             <span className="text-text-faint"> · </span>
-            <span>codex engine ready</span>
+            <span>RSG engine ready</span>
             <span className="text-text-faint"> · </span>
             <span className="text-accent-violet">market · DACH</span>
           </div>
@@ -208,8 +208,8 @@ function UnemploymentStat() {
   const value =
     snap?.ok && typeof snap.rate === 'number' ? `${snap.rate.toFixed(1)}%` : '—';
   const sub = snap?.ok && snap.period
-    ? `🇩🇪 unemployment · ${snap.period} · Eurostat`
-    : 'Eurostat · monthly';
+    ? `🇩🇪 unemployment · ${snap.period}`
+    : 'RSG Macro · monthly';
   return <Stat label="DE Arbeitslosenquote" value={value} sub={sub} tone="cyan" />;
 }
 

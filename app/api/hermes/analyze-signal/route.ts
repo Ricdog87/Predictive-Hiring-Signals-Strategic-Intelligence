@@ -4,6 +4,7 @@ import {
   isHermesConfigured,
   type AnalyzeSignalInput,
 } from '../../../../lib/hermesClient';
+import { stripVendor } from '../../../../lib/hermesClient';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -23,13 +24,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!isHermesConfigured()) {
+  if (!(await isHermesConfigured())) {
     return Response.json(
       {
         ok: false,
         fellBack: true,
         reason: 'unconfigured',
-        detail: 'HERMES_BASE_URL not set on the radar',
+        detail: 'RSG Intelligence Engine not configured',
       },
       { status: 200 }
     );
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
   }
   return Response.json({
     ok: true,
-    ...r.data,
+    ...stripVendor(r.data as unknown as Record<string, unknown>),
     generatedAt: new Date().toISOString(),
   });
 }

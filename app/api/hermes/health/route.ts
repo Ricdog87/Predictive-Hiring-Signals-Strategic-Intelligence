@@ -4,13 +4,13 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  if (!isHermesConfigured()) {
+  if (!(await isHermesConfigured())) {
     return Response.json(
       {
         ok: false,
         configured: false,
         reason: 'unconfigured',
-        detail: 'HERMES_BASE_URL not set on the radar',
+        detail: 'RSG Intelligence Engine not configured',
         generatedAt: new Date().toISOString(),
       },
       { status: 200 }

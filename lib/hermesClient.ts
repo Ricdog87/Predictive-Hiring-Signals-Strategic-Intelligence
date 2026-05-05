@@ -13,16 +13,23 @@
  *   HERMES_TIMEOUT_MS  default 25000
  */
 
+import { getConfig } from './runtimeConfig';
+
 const DEFAULT_TIMEOUT_MS = Number(process.env.HERMES_TIMEOUT_MS ?? 25_000);
 
-function baseUrl(): string | null {
-  const raw = process.env.HERMES_BASE_URL?.trim();
+async function baseUrl(): Promise<string | null> {
+  const raw = (await getConfig('HERMES_BASE_URL'))?.trim();
   if (!raw) return null;
   return raw.replace(/\/+$/, '');
 }
 
-export function isHermesConfigured(): boolean {
-  return baseUrl() !== null;
+export async function isHermesConfigured(): Promise<boolean> {
+  return (await baseUrl()) !== null;
+}
+
+/** Sync variant for the /api/health probe — checks env + cached value only. */
+export function isHermesConfiguredSync(): boolean {
+  return Boolean(process.env.HERMES_BASE_URL?.trim());
 }
 
 export interface HermesError {
@@ -53,13 +60,13 @@ interface CallOptions {
 }
 
 async function call<T>(opts: CallOptions): Promise<HermesResult<T>> {
-  const root = baseUrl();
+  const root = await baseUrl();
   if (!root) {
     return {
       ok: false,
       fellBack: true,
       reason: 'unconfigured',
-      detail: 'HERMES_BASE_URL not set',
+      detail: 'engine not configured',
     };
   }
 
@@ -68,7 +75,7 @@ async function call<T>(opts: CallOptions): Promise<HermesResult<T>> {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   };
-  const apiKey = process.env.HERMES_API_KEY?.trim();
+  const apiKey = (await getConfig('HERMES_API_KEY'))?.trim();
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   const ctrl = new AbortController();
@@ -278,4 +285,137 @@ export async function regionalInsight(
     // Live web search can take a moment — give it a longer leash.
     timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
   });
+}
+
+// -- Morning Brief ----------------------------------------------------------
+
+export interface MorningBriefInput {
+  role?: string;
+  locale?: string;
+  focusIndustries?: string[];
+  focusRegions?: string[];
+  watchlist?: string[];
+}
+
+export interface MorningBrief {
+  headline: string;
+  summary: string;
+  layoffPulse: Array<{
+    company: string;
+    headcount: number | null;
+    context: string;
+    source: string;
+  }>;
+  hiringPulse: Array<{
+    company: string;
+    context: string;
+    source: string;
+  }>;
+  deals: Array<{
+    type: 'M&A' | 'Funding' | 'Insolvency' | 'Spin-off';
+    companies: string[];
+    summary: string;
+    source: string;
+  }>;
+  macroPulse: string;
+  watchToday: string[];
+  confidence: number;
+}
+
+export async function morningBrief(
+  input: MorningBriefInput
+): Promise<HermesResult<{ brief: MorningBrief; citations?: string[]; model: string }>> {
+  return call<{ brief: MorningBrief; citations?: string[]; model: string }>({
+    method: 'POST',
+    path: '/morning-brief',
+    body: input,
+    timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
+  });
+}
+
+// -- Company Research (search-field backend) -------------------------------
+
+export interface CompanyResearchInput {
+  query: string;
+  region?: string;
+  sector?: string;
+  locale?: string;
+}
+
+export interface CompanyResearch {
+  canonical: string;
+  industry: string;
+  region: string;
+  headquarters: string;
+  employeeCount: number | null;
+  summary: string;
+  hiringPosture:
+    | 'expanding'
+    | 'exploring'
+    | 'consolidating'
+    | 'contracting'
+    | 'unknown';
+  recentSignals: Array<{
+    type: string;
+    title: string;
+    date: string;
+    source: string;
+    url: string;
+  }>;
+  rolesLikely: string[];
+  whyNow: string;
+  risks: string[];
+  confidence: number;
+}
+
+export async function researchCompany(
+  input: CompanyResearchInput
+): Promise<HermesResult<{ research: CompanyResearch; citations?: string[]; model: string }>> {
+  return call<{ research: CompanyResearch; citations?: string[]; model: string }>({
+    method: 'POST',
+    path: '/research-company',
+    body: input,
+    timeoutMs: Number(process.env.HERMES_TIMEOUT_MS_LIVE ?? 30_000),
+  });
+}
+
+/**
+ * Strip vendor-identifying metadata from any Hermes response before
+ * the radar's proxy returns it to the customer-facing dashboard.
+ * Removes `model`, `usage`, `engine` plus any vendor-domain citations.
+ * News citations (handelsblatt.com, tagesschau.de, manager-magazin.de
+ * etc.) are KEPT — those are the value the recruiter needs to verify.
+ */
+const VENDOR_DOMAINS = [
+  'perplexity.ai',
+  'openai.com',
+  'anthropic.com',
+  'openrouter.ai',
+  'sdmx.oecd.org',
+  'stats.oecd.org',
+  'data-api.ecb.europa.eu',
+  'developer.adzuna.com',
+  'api.adzuna.com',
+];
+
+export function stripVendor<T extends Record<string, unknown>>(
+  data: T
+): Omit<T, 'model' | 'usage' | 'engine'> {
+  const clone: Record<string, unknown> = { ...data };
+  delete clone.model;
+  delete clone.usage;
+  delete clone.engine;
+  const cits = clone.citations;
+  if (Array.isArray(cits)) {
+    clone.citations = (cits as unknown[]).filter((u): u is string => {
+      if (typeof u !== 'string') return false;
+      try {
+        const host = new URL(u).host.toLowerCase();
+        return !VENDOR_DOMAINS.some((d) => host.includes(d));
+      } catch {
+        return true;
+      }
+    });
+  }
+  return clone as Omit<T, 'model' | 'usage' | 'engine'>;
 }

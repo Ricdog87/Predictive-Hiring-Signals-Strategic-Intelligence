@@ -9,6 +9,23 @@ import {
 import type { SessionUser } from "@/lib/session";
 import { AnimatedNumber } from "./AnimatedNumber";
 
+/**
+ * Open the command palette by synthesizing the same ⌘K / Ctrl-K
+ * keypress the global hotkey hub already listens for. Used by the
+ * header search button so a tap on mobile (no keyboard) still works.
+ */
+function openSearchPalette(): void {
+  if (typeof window === "undefined") return;
+  const isMac = /Mac/i.test(navigator.platform);
+  const ev = new KeyboardEvent("keydown", {
+    key: "k",
+    metaKey: isMac,
+    ctrlKey: !isMac,
+    bubbles: true,
+  });
+  document.dispatchEvent(ev);
+}
+
 interface MarketOverviewHeaderProps {
   overview: MarketOverview;
   user: SessionUser;
@@ -40,22 +57,35 @@ export function MarketOverviewHeader({
           <span className="hidden md:flex items-center gap-1.5 rounded-sm border border-bg-border bg-bg-panel px-2 py-1">
             <span className="h-1.5 w-1.5 rounded-full bg-accent-green animate-pulse-soft" />
             <span className="text-2xs font-mono uppercase tracking-terminal text-text-secondary">
-              Read-only intelligence · Codex engine
+              RSG Engine · read-only intelligence
             </span>
           </span>
         </div>
         <div className="flex items-center gap-3">
           <Meta label={tz} value={time} />
           <Meta label="Market" value="DE · DACH" tone="cyan" />
-          <Meta label="Engine" value="Codex · MI v1.0" />
+          <Meta label="Engine" value="RSG · v1.0" />
           <Meta
             label="Temp"
             value={t.label.toUpperCase()}
             tone={temp === "overheated" ? "violet" : "cyan"}
           />
-          <button className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:text-text-primary">
+          <button
+            type="button"
+            onClick={openSearchPalette}
+            className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:border-accent-cyan/40 hover:text-accent-cyan"
+            title="Open search (⌘K)"
+            aria-label="Open search palette"
+          >
             ⌘K · Search
           </button>
+          <a
+            href="/admin/settings"
+            className="rounded-sm border border-bg-border bg-bg-panel px-2.5 py-1 font-mono text-2xs uppercase tracking-terminal text-text-secondary hover:border-accent-cyan/40 hover:text-accent-cyan"
+            title="Admin settings"
+          >
+            ⚙ Settings
+          </a>
           <div
             className="flex h-7 items-center gap-2 rounded-sm border border-bg-border bg-bg-panel pl-2 pr-2.5"
             title={`${user.fullName} · ${user.role}`}

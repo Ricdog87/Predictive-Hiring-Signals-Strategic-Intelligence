@@ -6,6 +6,10 @@
  *   POST /analyze-signal
  *   POST /analyze-company
  *   POST /generate-opportunity-brief
+ *   POST /regional-insight
+ *   POST /morning-brief
+ *   POST /research-company
+ *   POST /discover-dach-signals
  *
  * Bearer-auth is enforced when `HERMES_API_KEY` is set. OpenRouter is
  * the LLM provider; both model tiers + timeouts + budget guardrails
@@ -19,6 +23,9 @@ import { analyzeSignalHandler } from './handlers/analyzeSignal';
 import { analyzeCompanyHandler } from './handlers/analyzeCompany';
 import { opportunityBriefHandler } from './handlers/opportunityBrief';
 import { regionalInsightHandler } from './handlers/regionalInsight';
+import { morningBriefHandler } from './handlers/morningBrief';
+import { companyResearchHandler } from './handlers/companyResearch';
+import { discoverDachSignalsHandler } from './handlers/discoverDachSignals';
 
 const app = express();
 
@@ -45,6 +52,18 @@ app.post('/generate-opportunity-brief', (req, res) => {
 
 app.post('/regional-insight', (req, res) => {
   void regionalInsightHandler(req, res);
+});
+
+app.post('/morning-brief', (req, res) => {
+  void morningBriefHandler(req, res);
+});
+
+app.post('/research-company', (req, res) => {
+  void companyResearchHandler(req, res);
+});
+
+app.post('/discover-dach-signals', (req, res) => {
+  void discoverDachSignalsHandler(req, res);
 });
 
 app.use((_req, res) => {
