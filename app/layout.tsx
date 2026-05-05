@@ -1,10 +1,48 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RSG · Predictive Hiring Radar",
+  metadataBase: new URL("https://rsg-radar.vercel.app"),
+  title: {
+    default: "RSG · Predictive Hiring Radar",
+    template: "%s · RSG Hiring Radar",
+  },
   description:
-    "Strategic intelligence terminal surfacing predictive hiring signals from public market data.",
+    "Predictive Hiring Intelligence für den DACH-Markt — wer stellt jetzt ein, wer als nächstes, wer baut ab. Forward-looking Signale aus öffentlichen Marktdaten.",
+  applicationName: "RSG Hiring Radar",
+  authors: [{ name: "Recruiting SG" }],
+  keywords: [
+    "Hiring Intelligence",
+    "Predictive Recruiting",
+    "DACH",
+    "Talent Acquisition",
+    "Market Signals",
+    "Stellenmarkt",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "de_DE",
+    title: "RSG · Predictive Hiring Radar",
+    description:
+      "Dem Markt einen Schritt voraus — predictive Hiring-Signale aus öffentlichen Quellen.",
+    siteName: "RSG Hiring Radar",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "RSG · Predictive Hiring Radar",
+    description:
+      "Predictive Hiring Intelligence für den DACH-Markt.",
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ECE4D2",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -13,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="light">
+    <html lang="de" className="light">
       <head>
         <link
           rel="preconnect"

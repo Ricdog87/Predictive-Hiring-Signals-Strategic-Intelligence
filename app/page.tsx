@@ -415,8 +415,24 @@ export default function DashboardPage() {
               <span>
                 RSG · Market Intelligence Terminal · DE / DACH focus
               </span>
-              <span className="text-text-faint">
-                v1.0 · RSG Engine · live · read-only intelligence
+              <span className="flex items-center gap-3">
+                <a
+                  href="/impressum"
+                  className="hover:text-accent-cyan"
+                >
+                  Impressum
+                </a>
+                <span className="text-text-faint">·</span>
+                <a
+                  href="/datenschutz"
+                  className="hover:text-accent-cyan"
+                >
+                  Datenschutz
+                </a>
+                <span className="text-text-faint">·</span>
+                <span className="text-text-faint">
+                  v1.0 · RSG Engine · live
+                </span>
               </span>
             </footer>
           </main>
