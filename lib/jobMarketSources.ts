@@ -38,14 +38,22 @@ export function isAdzunaConfiguredSync(): boolean {
 }
 
 /**
- * Adzuna documents NACE-style category slugs. Curated subset that
- * maps cleanly to our internal sector taxonomy.
+ * Adzuna documents NACE-style category slugs. Curated set that
+ * maps cleanly to our internal sector taxonomy. 17 categories cover
+ * ~95% of the DACH recruiting market — IT, Engineering, Sales,
+ * Finance, Legal, Marketing, Retail, Healthcare, Manufacturing,
+ * Logistics, Consulting, HR, Creative, Energy, Scientific,
+ * Trade/Bau, Accounting.
  */
 export const ADZUNA_CATEGORIES = [
   'it-jobs',
   'engineering-jobs',
   'sales-jobs',
   'finance-jobs',
+  'accounting-finance-jobs',
+  'legal-jobs',
+  'pr-advertising-marketing-jobs',
+  'retail-jobs',
   'manufacturing-jobs',
   'logistics-warehouse-jobs',
   'healthcare-nursing-jobs',
@@ -54,6 +62,7 @@ export const ADZUNA_CATEGORIES = [
   'creative-design-jobs',
   'energy-oil-gas-jobs',
   'scientific-qa-jobs',
+  'trade-construction-jobs',
 ] as const;
 export type AdzunaCategory = (typeof ADZUNA_CATEGORIES)[number];
 
@@ -186,9 +195,14 @@ export interface AdzunaPulse {
     category: AdzunaCategory;
     postings: number;
     meanSalary: number | null;
+    /** True when Adzuna failed for this category (rate-limit, timeout
+     *  etc.). The row still renders so users see the full taxonomy. */
+    unavailable?: boolean;
   }>;
   topCompaniesAcross: Array<{ name: string; postings: number }>;
   fetchedAt: string;
+  okCount: number;
+  totalCategories: number;
 }
 
 export async function fetchAdzunaPulse(): Promise<
@@ -199,36 +213,64 @@ export async function fetchAdzunaPulse(): Promise<
     return { ok: false, reason: 'unconfigured' };
   }
   const settled = await Promise.all(
-    ADZUNA_CATEGORIES.map((c) => fetchAdzunaCategory(c))
+    ADZUNA_CATEGORIES.map(async (c) => ({
+      category: c,
+      result: await fetchAdzunaCategory(c),
+    }))
   );
-  const ok = settled.filter(
-    (s): s is { ok: true; data: AdzunaCategorySnapshot } => s.ok
+  const okEntries = settled.filter(
+    (s): s is { category: AdzunaCategory; result: { ok: true; data: AdzunaCategorySnapshot } } =>
+      s.result.ok
   );
-  if (ok.length === 0) {
+  if (okEntries.length === 0) {
     return { ok: false, reason: 'http_error', detail: 'all categories failed' };
   }
   const compTotals = new Map<string, number>();
-  for (const s of ok) {
-    for (const c of s.data.topCompanies) {
+  for (const s of okEntries) {
+    for (const c of s.result.data.topCompanies) {
       compTotals.set(c.name, (compTotals.get(c.name) ?? 0) + c.postings);
     }
   }
+  // Build a row per configured category — failed categories render as
+  // unavailable rather than silently disappearing. Sort: succeeded by
+  // postings desc, unavailable rows pushed to the bottom in declared
+  // order.
+  const rows = settled.map((s) => {
+    if (s.result.ok) {
+      return {
+        category: s.category,
+        postings: s.result.data.postings,
+        meanSalary: s.result.data.meanSalary,
+        unavailable: false,
+      };
+    }
+    return {
+      category: s.category,
+      postings: 0,
+      meanSalary: null,
+      unavailable: true,
+    };
+  });
+  rows.sort((a, b) => {
+    if (a.unavailable !== b.unavailable) return a.unavailable ? 1 : -1;
+    return b.postings - a.postings;
+  });
+
   return {
     ok: true,
     data: {
-      totalPostings: ok.reduce((acc, s) => acc + s.data.postings, 0),
-      byCategory: ok
-        .map((s) => ({
-          category: s.data.category,
-          postings: s.data.postings,
-          meanSalary: s.data.meanSalary,
-        }))
-        .sort((a, b) => b.postings - a.postings),
+      totalPostings: okEntries.reduce(
+        (acc, s) => acc + s.result.data.postings,
+        0
+      ),
+      byCategory: rows,
       topCompaniesAcross: Array.from(compTotals.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([name, postings]) => ({ name, postings })),
       fetchedAt: new Date().toISOString(),
+      okCount: okEntries.length,
+      totalCategories: ADZUNA_CATEGORIES.length,
     },
   };
 }

@@ -7,10 +7,17 @@ interface PulseResp {
   configured?: boolean;
   reason?: string;
   totalPostings?: number;
-  byCategory?: Array<{ category: string; postings: number; meanSalary: number | null }>;
+  byCategory?: Array<{
+    category: string;
+    postings: number;
+    meanSalary: number | null;
+    unavailable?: boolean;
+  }>;
   topCompaniesAcross?: Array<{ name: string; postings: number }>;
   fetchedAt?: string;
   generatedAt?: string;
+  okCount?: number;
+  totalCategories?: number;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -18,6 +25,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   'engineering-jobs': 'Engineering',
   'sales-jobs': 'Sales',
   'finance-jobs': 'Finance',
+  'accounting-finance-jobs': 'Accounting',
+  'legal-jobs': 'Legal',
+  'pr-advertising-marketing-jobs': 'Marketing / PR',
+  'retail-jobs': 'Retail',
   'manufacturing-jobs': 'Manufacturing',
   'logistics-warehouse-jobs': 'Logistik',
   'healthcare-nursing-jobs': 'Healthcare',
@@ -26,6 +37,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   'creative-design-jobs': 'Creative',
   'energy-oil-gas-jobs': 'Energy',
   'scientific-qa-jobs': 'Scientific / QA',
+  'trade-construction-jobs': 'Bau / Trade',
 };
 
 function fmt(n: number): string {
@@ -66,7 +78,12 @@ export function JobMarketPanel() {
   const max = useMemo(
     () =>
       data?.byCategory && data.byCategory.length > 0
-        ? Math.max(...data.byCategory.map((c) => c.postings))
+        ? Math.max(
+            1,
+            ...data.byCategory
+              .filter((c) => !c.unavailable)
+              .map((c) => c.postings)
+          )
         : 1,
     [data]
   );
@@ -82,7 +99,11 @@ export function JobMarketPanel() {
         <div className="flex items-center gap-3">
           <span className="label-eyebrow">DE Job Market · RSG Pulse</span>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            {data?.ok ? `${fmt(data.totalPostings ?? 0)} offene Stellen · 12 Kategorien` : 'live · DE'}
+            {data?.ok
+              ? `${fmt(data.totalPostings ?? 0)} offene Stellen · ${
+                  data.okCount ?? data.byCategory?.length ?? 0
+                }/${data.totalCategories ?? data.byCategory?.length ?? 0} Kategorien live`
+              : 'live · DE'}
           </span>
         </div>
         <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
@@ -129,20 +150,39 @@ export function JobMarketPanel() {
               </thead>
               <tbody>
                 {data.byCategory.map((c) => {
-                  const pct = (c.postings / max) * 100;
+                  const pct = c.unavailable ? 0 : (c.postings / max) * 100;
                   return (
-                    <tr key={c.category} className="border-b border-bg-line/50 hover:bg-bg-elevated/40">
+                    <tr
+                      key={c.category}
+                      className={`border-b border-bg-line/50 hover:bg-bg-elevated/40 ${
+                        c.unavailable ? 'opacity-50' : ''
+                      }`}
+                    >
                       <td className="px-3 py-2 align-middle">
-                        <div className="font-medium text-text-primary">
-                          {CATEGORY_LABEL[c.category] ?? c.category}
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium text-text-primary">
+                            {CATEGORY_LABEL[c.category] ?? c.category}
+                          </div>
+                          {c.unavailable && (
+                            <span
+                              className="rounded-sm border border-bg-border bg-bg-surface px-1 font-mono text-[9px] uppercase tracking-wider text-text-muted"
+                              title="Daten temporär nicht verfügbar (Rate-Limit oder Timeout)"
+                            >
+                              n/a
+                            </span>
+                          )}
                         </div>
                         <div className="font-mono text-2xs text-text-muted">{c.category}</div>
                       </td>
-                      <td className="num px-3 py-2 text-right align-middle text-accent-cyan">
-                        {fmt(c.postings)}
+                      <td
+                        className={`num px-3 py-2 text-right align-middle ${
+                          c.unavailable ? 'text-text-faint' : 'text-accent-cyan'
+                        }`}
+                      >
+                        {c.unavailable ? '—' : fmt(c.postings)}
                       </td>
                       <td className="num px-3 py-2 text-right align-middle text-text-secondary">
-                        {fmtSalary(c.meanSalary)}
+                        {c.unavailable ? '—' : fmtSalary(c.meanSalary)}
                       </td>
                       <td className="px-3 py-2 align-middle">
                         <div className="h-1.5 w-32 overflow-hidden rounded-full bg-bg-surface ring-1 ring-bg-border">
