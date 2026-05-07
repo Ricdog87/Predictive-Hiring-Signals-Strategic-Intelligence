@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DATA_SOURCES, PRIMARY_NAV } from "@/lib/uiMockData";
+import { DATA_SOURCES, PRIMARY_NAV, type TabId } from "@/lib/uiMockData";
 import type { SessionUser } from "@/lib/session";
 import { useWatchlist } from "@/lib/watchlist";
 import type { CompanyView } from "@/lib/marketView";
@@ -9,55 +9,20 @@ import type { CompanyView } from "@/lib/marketView";
 interface IntelligenceSidebarProps {
   user?: SessionUser;
   companies?: CompanyView[];
+  activeTab?: TabId;
+  onSwitchTab?: (id: TabId) => void;
   onSelectCompany?: (companyId: string) => void;
   onOpenPalette?: () => void;
-}
-
-function useActiveSection(anchors: string[]): string | null {
-  const [active, setActive] = useState<string | null>(anchors[0] ?? null);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const targets = anchors
-      .map((a) => document.getElementById(a))
-      .filter((x): x is HTMLElement => Boolean(x));
-    if (targets.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible[0]?.target?.id) {
-          setActive(visible[0].target.id);
-        }
-      },
-      {
-        // Mark a section "active" once its top crosses the upper third
-        // of the viewport. Bottom margin keeps the last section selectable.
-        rootMargin: "-30% 0px -55% 0px",
-        threshold: [0, 0.25, 0.5, 0.75, 1],
-      }
-    );
-    targets.forEach((t) => observer.observe(t));
-    return () => observer.disconnect();
-  }, [anchors]);
-  return active;
-}
-
-function scrollToAnchor(anchor: string) {
-  if (typeof window === "undefined") return;
-  const el = document.getElementById(anchor);
-  if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 export function IntelligenceSidebar({
   user,
   companies = [],
+  activeTab,
+  onSwitchTab,
   onSelectCompany,
   onOpenPalette,
 }: IntelligenceSidebarProps = {}) {
-  const anchors = PRIMARY_NAV.map((n) => n.anchor);
-  const active = useActiveSection(anchors);
   const { pinned, toggle } = useWatchlist();
   const watchlistCompanies = pinned
     .map((id) => companies.find((c) => c.id === id))
@@ -94,8 +59,8 @@ export function IntelligenceSidebar({
     setMobileOpen(false);
   };
 
-  const handleScroll = (anchor: string) => {
-    scrollToAnchor(anchor);
+  const handleSwitchTab = (id: TabId) => {
+    onSwitchTab?.(id);
     setMobileOpen(false);
   };
 
@@ -186,18 +151,19 @@ export function IntelligenceSidebar({
           <SectionHeader label="Workspace" />
           <ul className="space-y-0.5">
             {PRIMARY_NAV.map((n) => {
-              const isActive = active === n.anchor;
+              const isActive = activeTab === n.id;
               return (
                 <li key={n.id}>
                   <button
                     type="button"
-                    onClick={() => handleScroll(n.anchor)}
+                    onClick={() => handleSwitchTab(n.id)}
                     aria-current={isActive ? "true" : undefined}
                     className={`group flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-[12.5px] transition-colors ${
                       isActive
                         ? "bg-accent-cyan/10 text-accent-cyan"
                         : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
                     }`}
+                    title={n.hint}
                   >
                     <span
                       className={`font-mono text-[12px] ${
@@ -207,8 +173,10 @@ export function IntelligenceSidebar({
                       {n.glyph}
                     </span>
                     <span className="flex-1 text-left">{n.label}</span>
-                    {isActive && (
-                      <span className="h-1 w-1 rounded-full bg-accent-cyan" />
+                    {n.chord && (
+                      <span className="font-mono text-[10px] text-text-faint">
+                        {n.chord}
+                      </span>
                     )}
                   </button>
                 </li>

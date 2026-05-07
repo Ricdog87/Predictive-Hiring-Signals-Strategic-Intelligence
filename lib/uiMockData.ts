@@ -1,6 +1,6 @@
 /**
  * UI-only chrome data — sidebar nav, source-pulse list, watchlist
- * scaffolds. The dashboard panels themselves consume the live Codex API;
+ * scaffolds. The dashboard panels themselves consume the live engine API;
  * this file only powers ambient surface state.
  */
 
@@ -38,23 +38,34 @@ export const UI_WATCHLISTS: UIWatchlist[] = [
   { id: "wl-restructuring", name: "Restructuring watch", count: 9, pinned: false, hint: "Companies with active restructuring or insolvency signals" },
 ];
 
+/**
+ * Bloomberg-style top-level dashboard tabs. Only the active tab renders
+ * its content area — keeps the surface clean and click-driven.
+ */
+export const TAB_IDS = [
+  "companies",
+  "sectors",
+  "insolvenz",
+  "jobs",
+  "forecast",
+  "briefing",
+] as const;
+export type TabId = (typeof TAB_IDS)[number];
+
 export interface NavSection {
-  id: string;
+  id: TabId;
   label: string;
   glyph: string;
-  /** DOM id of the dashboard section that should scroll into view. */
-  anchor: string;
   hint?: string;
+  /** Bloomberg-chord shortcut, e.g. "g co". */
+  chord?: string;
 }
 
 export const PRIMARY_NAV: NavSection[] = [
-  { id: "radar", label: "Market Radar", glyph: "◎", anchor: "section-overview" },
-  { id: "sectors", label: "Sector Trends", glyph: "▤", anchor: "section-sectors" },
-  { id: "regions", label: "Region Trends", glyph: "◬", anchor: "section-regions" },
-  { id: "de-regions", label: "DE · Quadranten", glyph: "🇩🇪", anchor: "section-de-regions" },
-  { id: "jobmarket", label: "Job Market", glyph: "⊞", anchor: "section-jobmarket" },
-  { id: "clusters", label: "Cluster Heatmap", glyph: "▦", anchor: "section-clusters" },
-  { id: "companies", label: "Companies", glyph: "◫", anchor: "section-companies" },
-  { id: "forecast", label: "Forecast", glyph: "ℙ", anchor: "section-forecast" },
-  { id: "timeline", label: "Signal Timeline", glyph: "⌖", anchor: "section-timeline" },
+  { id: "companies", label: "Companies", glyph: "◫", chord: "g co", hint: "Radar · Filter · Inspector" },
+  { id: "sectors",   label: "Macro",     glyph: "▤", chord: "g s",  hint: "Sectors · Regions · DE Quadranten · Clusters" },
+  { id: "insolvenz", label: "Insolvenz", glyph: "✖", chord: "g i",  hint: "Insolvenz + Restructuring · 30d" },
+  { id: "jobs",      label: "Jobs",      glyph: "⊞", chord: "g j",  hint: "DE Job-Market Pulse" },
+  { id: "forecast",  label: "Forecast",  glyph: "ℙ", chord: "g f",  hint: "Predicted roles + Signal Timeline" },
+  { id: "briefing",  label: "Briefing",  glyph: "✦", chord: "g b",  hint: "Morning Brief · Layoffs · Hiring · Deals" },
 ];

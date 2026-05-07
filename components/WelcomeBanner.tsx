@@ -12,19 +12,12 @@ interface WelcomeBannerProps {
   totalSources: number;
 }
 
-const BOOT_LINES = [
-  "kernel · ingestion-pipeline ............. ok",
-  "adapter · bundesanzeiger ................ live",
-  "adapter · handelsregister ............... live",
-  "engine  · rsg / market-intelligence ..... ok",
-  "engine  · scoring v2.1.0 ................ ok",
-  "feed    · ticker bound .................. ok",
-];
+const STORAGE_KEY = "rsg.welcome.dismissed.v2";
 
 /**
- * Futuristic on-load banner that slides in, runs a short boot sequence and
- * settles into a permanent greeting strip. Bloomberg-grade density on the
- * right (live UTC clock, market badges) — playful warmup on the left.
+ * Compact one-line greeting. Dismissible — once closed it stays closed
+ * across reloads. The market KPIs that used to live here are already
+ * shown in the sticky tape above and the macro strip below.
  */
 export function WelcomeBanner({
   user,
@@ -33,243 +26,104 @@ export function WelcomeBanner({
   totalSources,
 }: WelcomeBannerProps) {
   const [now, setNow] = useState<Date | null>(null);
-  const [bootStep, setBootStep] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 1000);
+    const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
-    if (bootStep >= BOOT_LINES.length) return;
-    const t = setTimeout(() => setBootStep((s) => s + 1), 140);
-    return () => clearTimeout(t);
-  }, [bootStep]);
+    setHydrated(true);
+    try {
+      if (window.localStorage.getItem(STORAGE_KEY) === "1") {
+        setDismissed(true);
+      }
+    } catch {
+      /* private mode → just stay visible */
+    }
+  }, []);
 
   const greeting = useMemo(
     () => (now ? timeOfDayGreeting(now) : "Guten Tag"),
     [now]
   );
 
-  const localStamp = now ? formatLocalTime(now) : "—";
-  const dateStamp = now ? formatLocalDate(now) : "—";
-  const tzLabel = useMemo(getTimezoneLabel, []);
-
+  const dateStamp = now ? formatLocalDate(now) : "";
   const allOnline = sourcesOnline === totalSources && totalSources > 0;
+
+  if (!hydrated || dismissed) return null;
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <section
       aria-label="Session welcome"
-      className="relative overflow-hidden border-b border-bg-border bg-bg-surface animate-slide-down"
+      className="flex items-center justify-between gap-3 border-b border-bg-border bg-bg-surface/80 px-5 py-1.5"
     >
-      {/* faint scan sweep */}
-      <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-accent-cyan/[0.06] to-transparent animate-scan-sweep"
-        aria-hidden
-      />
-      {/* corner brackets */}
-      <CornerBrackets />
-
-      <div className="relative grid grid-cols-1 gap-px bg-bg-border lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="bg-bg-surface px-5 py-4">
-          <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-terminal text-accent-cyan animate-fade-in">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan animate-pulse-soft" />
-            <span>session · authenticated</span>
-            <span className="text-text-faint">/</span>
-            <span className="text-text-secondary">{user.role}</span>
-          </div>
-
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 animate-fade-in-up">
-            <h1 className="text-[22px] font-semibold tracking-tight text-text-primary">
-              <span className="text-text-secondary">{greeting},</span>{" "}
-              <span className="text-glow-cyan text-accent-cyan">
-                {user.firstName}
-              </span>
-              <span className="ml-0.5 inline-block h-[18px] w-[8px] translate-y-[2px] bg-accent-cyan animate-cursor-blink align-baseline" />
-            </h1>
-            <span className="font-mono text-2xs uppercase tracking-terminal text-text-muted">
-              {dateStamp}
-            </span>
-          </div>
-
-          <div
-            className="mt-1 font-mono text-[12px] text-text-secondary animate-fade-in-up"
-            style={{ animationDelay: "120ms" }}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-2xs uppercase tracking-terminal">
+        <span className="flex items-center gap-1.5">
+          <span
+            className={
+              allOnline ? "text-accent-green" : "text-accent-amber"
+            }
           >
-            <span
-              className={
-                allOnline ? "text-accent-green" : "text-accent-amber"
-              }
-            >
-              {allOnline ? "▸ all systems online" : "▸ partial systems online"}
+            ●
+          </span>
+          <span className="text-text-secondary">
+            {greeting},{" "}
+            <span className="text-accent-cyan">{user.firstName}</span>
+          </span>
+        </span>
+        {dateStamp && (
+          <>
+            <span className="text-text-faint">·</span>
+            <span className="text-text-muted">{dateStamp}</span>
+          </>
+        )}
+        <span className="text-text-faint">·</span>
+        <span className="text-text-muted">
+          {sourcesOnline}/{totalSources} feeds streaming
+        </span>
+        {overview && (
+          <>
+            <span className="text-text-faint">·</span>
+            <span className="text-text-muted">
+              ⌀ score{" "}
+              <span className="text-accent-cyan">
+                {overview.averageHiringScore.toFixed(1)}
+              </span>
             </span>
-            <span className="text-text-faint"> · </span>
-            <span>
-              {sourcesOnline}/{totalSources} feeds streaming
+            <span className="text-text-faint">·</span>
+            <span className="text-text-muted">
+              <span className="text-accent-green">
+                {overview.newSignals24h}
+              </span>{" "}
+              new · 24h
             </span>
-            <span className="text-text-faint"> · </span>
-            <span>RSG engine ready</span>
-            <span className="text-text-faint"> · </span>
-            <span className="text-accent-violet">market · DACH</span>
-          </div>
-
-          {/* boot sequence */}
-          <div className="mt-3 max-w-[640px]">
-            <div className="relative h-1 overflow-hidden rounded-full bg-bg-elevated ring-1 ring-bg-border">
-              <div className="absolute inset-y-0 left-0 animate-boot-fill rounded-full bg-gradient-to-r from-accent-cyan via-accent-violet to-accent-green" />
-            </div>
-            <ul className="mt-2 grid grid-cols-1 gap-y-0.5 font-mono text-[10.5px] uppercase tracking-wider text-text-muted sm:grid-cols-2">
-              {BOOT_LINES.map((line, i) => {
-                const done = i < bootStep;
-                return (
-                  <li
-                    key={line}
-                    className={`flex items-center gap-2 transition-opacity duration-300 ${
-                      done ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    <span className="text-accent-green">[ok]</span>
-                    <span className="truncate">{line}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 bg-bg-surface lg:grid-cols-1 lg:divide-y lg:divide-bg-border">
-          <Stat
-            label={`Local · ${tzLabel}`}
-            value={localStamp}
-            sub="live · realtime"
-            tone="cyan"
-          />
-          <Stat
-            label="Hiring score · radar avg"
-            value={
-              overview ? overview.averageHiringScore.toFixed(1) : "—"
-            }
-            sub={
-              overview
-                ? `${overview.highProbabilityCompanies} high-prob · ≥ 70`
-                : "awaiting data"
-            }
-            tone="violet"
-          />
-          <Stat
-            label="Signals · 24h"
-            value={
-              overview ? overview.newSignals24h.toString() : "—"
-            }
-            sub={
-              overview
-                ? `${overview.totalSignals} total · ${overview.positiveGrowthSignals}↑ ${overview.negativeRiskSignals}↓`
-                : "awaiting data"
-            }
-            tone="green"
-          />
-          <UnemploymentStat />
-        </div>
+          </>
+        )}
       </div>
+      <button
+        type="button"
+        onClick={handleDismiss}
+        className="shrink-0 rounded-sm border border-bg-border px-1.5 py-0.5 font-mono text-2xs uppercase tracking-terminal text-text-muted hover:border-accent-cyan/40 hover:text-accent-cyan"
+        aria-label="Dismiss greeting"
+        title="Dismiss"
+      >
+        ×
+      </button>
     </section>
   );
-}
-
-interface UnemploymentResp {
-  ok: boolean;
-  rate?: number;
-  period?: string;
-  source?: string;
-  fetchedAt?: string;
-}
-
-function UnemploymentStat() {
-  const [snap, setSnap] = useState<UnemploymentResp | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/macro/de-unemployment', {
-          cache: 'force-cache',
-        });
-        if (!res.ok) return;
-        const json = (await res.json()) as UnemploymentResp;
-        if (!cancelled) setSnap(json);
-      } catch {
-        // graceful — leave the cell as awaiting
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const value =
-    snap?.ok && typeof snap.rate === 'number' ? `${snap.rate.toFixed(1)}%` : '—';
-  const sub = snap?.ok && snap.period
-    ? `🇩🇪 unemployment · ${snap.period}`
-    : 'RSG Macro · monthly';
-  return <Stat label="DE Arbeitslosenquote" value={value} sub={sub} tone="cyan" />;
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "cyan" | "violet" | "green";
-}) {
-  const fg =
-    tone === "cyan"
-      ? "text-accent-cyan"
-      : tone === "violet"
-      ? "text-accent-violet"
-      : tone === "green"
-      ? "text-accent-green"
-      : "text-text-primary";
-  return (
-    <div className="px-5 py-3">
-      <div className="label-eyebrow flex items-center justify-between">
-        <span className="truncate">{label}</span>
-        <span className="text-text-faint">live</span>
-      </div>
-      <div className={`num mt-1 text-[20px] font-semibold leading-none ${fg}`}>
-        {value}
-      </div>
-      {sub && (
-        <div className="mt-1 font-mono text-2xs uppercase tracking-wider text-text-muted">
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CornerBrackets() {
-  const cls =
-    "pointer-events-none absolute h-3 w-3 border-accent-cyan/40";
-  return (
-    <>
-      <span className={`${cls} left-0 top-0 border-l border-t`} />
-      <span className={`${cls} right-0 top-0 border-r border-t`} />
-      <span className={`${cls} bottom-0 left-0 border-b border-l`} />
-      <span className={`${cls} bottom-0 right-0 border-b border-r`} />
-    </>
-  );
-}
-
-function formatLocalTime(d: Date): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(d);
 }
 
 function formatLocalDate(d: Date): string {
@@ -277,17 +131,5 @@ function formatLocalDate(d: Date): string {
     weekday: "short",
     day: "2-digit",
     month: "short",
-    year: "numeric",
   }).format(d);
-}
-
-function getTimezoneLabel(): string {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (!tz) return "local";
-    const city = tz.split("/").pop()?.replace(/_/g, " ");
-    return city ?? tz;
-  } catch {
-    return "local";
-  }
 }
