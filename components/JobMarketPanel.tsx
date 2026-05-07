@@ -185,6 +185,20 @@ export function JobMarketPanel() {
           </div>
         </div>
       )}
+
+      {data?.ok && (
+        <div className="border-t border-bg-border px-5 py-2.5 font-mono text-2xs text-text-faint">
+          Job-Daten:{" "}
+          <a
+            href="https://adzuna.de"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-text-secondary"
+          >
+            Powered by Adzuna
+          </a>
+        </div>
+      )}
     </div>
   );
 }
