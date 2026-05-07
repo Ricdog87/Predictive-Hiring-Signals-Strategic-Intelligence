@@ -226,7 +226,7 @@ export function aggregateRegional({
   for (const agg of aggregates) {
     // v2 fix · check signal.meta first (discovery_dach + classifier signals
     // carry concrete `bundesland` codes + `headquarters` cities directly).
-    let land: BundeslandRecord | undefined;
+    let land: BundeslandRecord | null = null;
     for (const sig of agg.signals) {
       const meta = (sig as { meta?: { bundesland?: string; headquarters?: string } }).meta;
       if (!meta) continue;
