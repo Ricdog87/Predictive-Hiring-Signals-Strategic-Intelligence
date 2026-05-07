@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface InsolvenzItem {
   signalId: string;
@@ -22,6 +22,7 @@ interface InsolvenzItem {
 interface InsolvenzResp {
   ok: boolean;
   count: number;
+  windowDays?: number;
   generatedAt: string;
   summary: {
     insolvencies: number;
@@ -30,6 +31,9 @@ interface InsolvenzResp {
   };
   data: InsolvenzItem[];
 }
+
+type WindowChoice = 30 | 90 | 180;
+type FilterChoice = "all" | "insolvency" | "restructuring";
 
 const SIGNAL_LABEL: Record<InsolvenzItem["signalType"], string> = {
   insolvency: "Insolvenz",
@@ -45,12 +49,18 @@ function daysLabel(d: number): string {
 export function InsolvenzPulsePanel() {
   const [data, setData] = useState<InsolvenzResp | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [windowDays, setWindowDays] = useState<WindowChoice>(90);
+  const [filter, setFilter] = useState<FilterChoice>("all");
 
   useEffect(() => {
     let cancelled = false;
+    setData(null);
     (async () => {
       try {
-        const res = await fetch("/api/insolvenz-pulse", { cache: "no-store" });
+        const res = await fetch(
+          `/api/insolvenz-pulse?window=${windowDays}`,
+          { cache: "no-store" }
+        );
         if (!res.ok) throw new Error(`status ${res.status}`);
         const json = (await res.json()) as InsolvenzResp;
         if (!cancelled) {
@@ -64,25 +74,68 @@ export function InsolvenzPulsePanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [windowDays]);
 
-  const top = data?.data.slice(0, 8) ?? [];
-  const empty = data && data.count === 0;
+  const visible = useMemo(() => {
+    if (!data) return [] as InsolvenzItem[];
+    if (filter === "all") return data.data;
+    return data.data.filter((it) => it.signalType === filter);
+  }, [data, filter]);
+
+  const empty = data && visible.length === 0;
+  const totalLabel =
+    data && data.count > 0
+      ? `${data.summary.insolvencies} Insolvenzen · ${data.summary.restructurings} Restructurings`
+      : "live · DACH";
 
   return (
     <div className="panel">
-      <div className="panel-header">
+      <div className="panel-header flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <span className="label-eyebrow">Insolvenz · Restructuring · 30 Tage</span>
+          <span className="label-eyebrow">Insolvenz · Restructuring</span>
           <span className="font-mono text-2xs uppercase tracking-wider text-text-faint">
-            {data
-              ? `${data.summary.insolvencies} Insolvenzen · ${data.summary.restructurings} Restructurings`
-              : "live · DACH"}
+            {totalLabel}
           </span>
         </div>
-        <span className="font-mono text-2xs uppercase tracking-wider text-text-muted">
-          Outplacement · Restructuring Plays
-        </span>
+        <div className="flex items-center gap-1.5">
+          <FilterChip
+            label={`Alle ${data ? `(${data.count})` : ""}`}
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+          />
+          <FilterChip
+            label={`Insolvenz ${
+              data ? `(${data.summary.insolvencies})` : ""
+            }`}
+            active={filter === "insolvency"}
+            tone="red"
+            onClick={() => setFilter("insolvency")}
+          />
+          <FilterChip
+            label={`Restructuring ${
+              data ? `(${data.summary.restructurings})` : ""
+            }`}
+            active={filter === "restructuring"}
+            tone="amber"
+            onClick={() => setFilter("restructuring")}
+          />
+          <span className="mx-1 h-4 w-px bg-bg-border" aria-hidden />
+          <FilterChip
+            label="30d"
+            active={windowDays === 30}
+            onClick={() => setWindowDays(30)}
+          />
+          <FilterChip
+            label="90d"
+            active={windowDays === 90}
+            onClick={() => setWindowDays(90)}
+          />
+          <FilterChip
+            label="180d"
+            active={windowDays === 180}
+            onClick={() => setWindowDays(180)}
+          />
+        </div>
       </div>
 
       {error && (
@@ -101,21 +154,27 @@ export function InsolvenzPulsePanel() {
         <div className="px-5 py-5">
           <div className="rounded-sm border border-dashed border-bg-line bg-bg-surface/40 p-4 text-[12.5px] text-text-secondary">
             <div className="font-semibold text-text-primary">
-              Keine Insolvenzen oder Restructurings in den letzten 30 Tagen.
+              {filter !== "all"
+                ? `Keine ${
+                    filter === "insolvency" ? "Insolvenzen" : "Restructurings"
+                  } im ${windowDays}-Tage-Fenster.`
+                : `Keine Insolvenzen oder Restructurings in den letzten ${windowDays} Tagen.`}
             </div>
             <div className="mt-1 text-text-muted">
               Sobald die Pipeline Bundesanzeiger / Wirtschaftspresse-Signale klassifiziert,
               erscheinen sie hier — nach Bundesland sortiert, mit Tageszahl seit Antrag.
+              Wechsle in ein größeres Fenster (90d / 180d) um mehr historische Treffer zu sehen.
             </div>
           </div>
         </div>
       )}
 
-      {data && data.count > 0 && (
+      {data && data.count > 0 && visible.length > 0 && (
         <div className="grid grid-cols-1 gap-px border-b border-bg-border bg-bg-border lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="bg-bg-panel">
+            <div className="max-h-[640px] overflow-y-auto">
             <ul className="divide-y divide-bg-line/60">
-              {top.map((it) => {
+              {visible.map((it) => {
                 const isInsolv = it.signalType === "insolvency";
                 const tone = isInsolv ? "text-accent-red" : "text-accent-amber";
                 const bgTone = isInsolv ? "bg-accent-red" : "bg-accent-amber";
@@ -180,6 +239,7 @@ export function InsolvenzPulsePanel() {
                 );
               })}
             </ul>
+            </div>
           </div>
 
           <div className="bg-bg-panel p-4">
@@ -190,7 +250,7 @@ export function InsolvenzPulsePanel() {
               </div>
             ) : (
               <ul className="space-y-1.5">
-                {data.summary.byBundesland.slice(0, 8).map((b) => (
+                {data.summary.byBundesland.slice(0, 16).map((b) => (
                   <li
                     key={b.code}
                     className="flex items-center justify-between text-[12.5px]"
@@ -209,11 +269,43 @@ export function InsolvenzPulsePanel() {
               </ul>
             )}
             <div className="mt-3 border-t border-bg-border pt-2 font-mono text-2xs uppercase tracking-wider text-text-muted">
-              Goldmine · Outplacement · 30d window
+              Goldmine · Outplacement · {windowDays}d window
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  tone,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  tone?: "red" | "amber";
+  onClick: () => void;
+}) {
+  const accent =
+    tone === "red"
+      ? "border-accent-red/40 text-accent-red"
+      : tone === "amber"
+      ? "border-accent-amber/40 text-accent-amber"
+      : "border-accent-cyan/40 text-accent-cyan";
+  const inactive =
+    "border-bg-border bg-bg-panel text-text-secondary hover:border-accent-cyan/30 hover:text-text-primary";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-sm border px-2 py-0.5 font-mono text-2xs uppercase tracking-terminal transition-colors ${
+        active ? `${accent} bg-bg-elevated` : inactive
+      }`}
+    >
+      {label}
+    </button>
   );
 }

@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { getCompanies, getSignals } from '../../../lib/mockData';
 import { resolveBundesland } from '../../../lib/germanRegions';
 import type { CompanySignal, CompanyProfile, HiringSignalType } from '../../../lib/types';
@@ -7,7 +8,9 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const TARGET_TYPES: HiringSignalType[] = ['insolvency', 'restructuring'];
-const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_WINDOW_DAYS = 90;
+const MAX_WINDOW_DAYS = 365;
 
 interface InsolvenzItem {
   signalId: string;
@@ -29,6 +32,7 @@ interface InsolvenzItem {
 interface InsolvenzResp {
   ok: true;
   count: number;
+  windowDays: number;
   generatedAt: string;
   summary: {
     insolvencies: number;
@@ -76,13 +80,19 @@ function resolveLand(
   return { code: null, name: null };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const rawWindow = Number(url.searchParams.get('window'));
+  const windowDays =
+    Number.isFinite(rawWindow) && rawWindow > 0
+      ? Math.min(MAX_WINDOW_DAYS, Math.max(1, Math.floor(rawWindow)))
+      : DEFAULT_WINDOW_DAYS;
   const [companies, signals] = await Promise.all([
     getCompanies(),
     getSignals(),
   ]);
   const companyById = new Map(companies.map((c) => [c.id, c]));
-  const cutoff = Date.now() - WINDOW_MS;
+  const cutoff = Date.now() - windowDays * DAY_MS;
 
   const items: InsolvenzItem[] = [];
   for (const s of signals) {
@@ -102,7 +112,7 @@ export async function GET() {
       bundeslandName: land.name,
       signalType: s.signalType as 'insolvency' | 'restructuring',
       observedAt: s.observedAt,
-      daysAgo: Math.max(0, Math.floor((Date.now() - observed) / (24 * 60 * 60 * 1000))),
+      daysAgo: Math.max(0, Math.floor((Date.now() - observed) / DAY_MS)),
       impact: s.impact,
       confidence: s.confidence,
       title: metaString(s.meta, 'title', 'headline'),
@@ -130,6 +140,7 @@ export async function GET() {
   const body: InsolvenzResp = {
     ok: true,
     count: items.length,
+    windowDays,
     generatedAt: new Date().toISOString(),
     summary: { insolvencies, restructurings, byBundesland },
     data: items,
