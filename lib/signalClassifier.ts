@@ -1,43 +1,36 @@
 /**
- * Hybrid signal classifier · v1.
+ * Hybrid signal classifier · v2 (DACH-content erweitert).
  *
  * Three layers, evaluated in order:
  *   1. Negative-signal detection — insolvency / restructuring / layoffs
- *      win first, even if positive keywords appear ("Restructuring
- *      following acquisition" is restructuring, not mna_buy).
- *   2. Keyword layer — single-pattern matches against the title +
- *      description. Each rule carries a base impact and confidence.
- *   3. Semantic context layer — combinations of weaker keywords
- *      ("opens" + "office" / "neue" + "niederlassung") that only
- *      classify when at least two terms co-occur.
+ *      win first, even if positive keywords appear.
+ *   2. Keyword layer — single-pattern matches against title + description.
+ *   3. Semantic context layer — combinations of weaker keywords.
  *
- * If nothing fires, the function returns null. A caller is free to
- * fall back to "press_release" with low confidence — the classifier
- * itself does not guess.
+ * v2 extensions:
+ *   - Insolvency: "meldet Insolvenz an", "geht in die Insolvenz", "schutzschirmverfahren"
+ *   - Restructuring: "Werksschließung", "Standortzusammenlegung", "Kurzarbeit"
+ *   - C-Level (gf_change): "wechselt an die Spitze", "neuer Geschäftsführer", "übernimmt Vorstand"
+ *   - Job_spike: "stellt hunderte ein", "schafft Arbeitsplätze", "Ausbildung"
+ *   - Tarif/Streik (restructuring): Verdi, IG-Metall Streiks → leading indicator
+ *   - Standort-News (location_expansion): "neuer Campus", "Erweiterung des Werks"
  */
 
 import type { HiringSignalType } from './types';
 
 export interface ClassificationResult {
   signalType: HiringSignalType;
-  /** Raw confidence before source-trust modulation, 0..1. */
   confidence: number;
-  /** Suggested impact, -100..100. */
   impact: number;
-  /** Short human-readable label of the rule that fired. */
   confidenceReason: string;
-  /** Patterns that matched in the input text. */
   matchedPatterns: string[];
-  /** Which layer fired the classification. */
   layer: 'negative' | 'keyword' | 'semantic';
-  /** Human-readable rationale for downstream "whyNow" narratives. */
   semanticReason: string;
 }
 
 interface KeywordRule {
   type: HiringSignalType;
   patterns: RegExp[];
-  /** Negative regexes that disqualify the rule. */
   negate?: RegExp[];
   baseImpact: number;
   baseConfidence: number;
@@ -46,7 +39,6 @@ interface KeywordRule {
 
 interface SemanticRule {
   type: HiringSignalType;
-  /** All groups must hit at least once for the rule to fire. */
   groups: RegExp[][];
   baseImpact: number;
   baseConfidence: number;
@@ -64,6 +56,13 @@ const NEGATIVE_RULES: KeywordRule[] = [
       /\bpleite\b/i,
       /\binsolvenzverfahren\b/i,
       /\bschutzschirmverfahren\b/i,
+      /\bmeldet\s+(?:die\s+)?insolvenz\s+an/i,
+      /\binsolvenzantrag\s+gestellt/i,
+      /\bgeht\s+in\s+die\s+insolvenz/i,
+      /\bstellt\s+insolvenzantrag/i,
+      /\bantrag\s+auf\s+insolvenz/i,
+      /\bvor\s+der\s+insolvenz/i,
+      /\bregelinsolvenz\b/i,
     ],
     baseImpact: -38,
     baseConfidence: 0.92,
@@ -88,10 +87,30 @@ const NEGATIVE_RULES: KeywordRule[] = [
       /\bwerk(?:s)?schließung\w*/i,
       /\bstandortschließung\w*/i,
       /\bwill\s+\d{2,}\s+(mitarbeitende|stellen|jobs)/i,
+      // v2 additions
+      /\bschließt\s+werk/i,
+      /\bschließt\s+standort/i,
+      /\bstandort\s+wird\s+geschlossen/i,
+      /\bstandortzusammenlegung\b/i,
+      /\bstandortverlagerung\b/i,
+      /\bverlagert\s+(produktion|werk|standort)/i,
+      /\bkurzarbeit\b/i,
+      /\bmassenentlassung\w*/i,
+      /\bbetriebsbedingte?\s+kündigung\w*/i,
+      /\baufhebungsvertra\w+/i,
+      /\bsozialplan\b/i,
+      /\bfreisetz\w+\s+\d+/i,
+      /\bfreiwilligenprogramm\w*/i,
+      /\babbau\s+(?:von|um)\s+\d+/i,
+      // Tarif / Streik (leading indicator for restructuring)
+      /\bstreik\b/i,
+      /\bwarnstreik\b/i,
+      /\btarifkonflikt\b/i,
+      /\bpersonalprobleme\b/i,
     ],
     baseImpact: -22,
     baseConfidence: 0.78,
-    reason: 'Restructuring / workforce reduction',
+    reason: 'Restructuring / workforce reduction / labor conflict',
   },
   {
     type: 'mna_sell',
@@ -102,6 +121,8 @@ const NEGATIVE_RULES: KeywordRule[] = [
       /\babspaltung\w*/i,
       /\bspin-?off\b/i,
       /\btrennt\s+sich\s+von\b/i,
+      /\bveräußerung\b/i,
+      /\bcarve-?out\b/i,
     ],
     baseImpact: -14,
     baseConfidence: 0.78,
@@ -113,30 +134,27 @@ const KEYWORD_RULES: KeywordRule[] = [
   {
     type: 'mna_buy',
     patterns: [
-      // English
       /\bacquir(?:es|ed|ing|ition)\b/i,
       /\bbuys?\b/i,
       /\bbuy-?out\b/i,
       /\btakeover\b/i,
       /\bmerger\b/i,
-      // German — verb stem `übernimm/übernehm/übernomm` + noun "Übernahme"
       /\büberni[mn]m\w*/i,
       /\bübernehm\w*/i,
       /\bübernomm\w*/i,
       /\bübernahme\w*/i,
-      // German verb stem `erwirb/erwerb/erworben`
       /\berwirb\w*/i,
       /\berwerb\w*/i,
       /\berworb\w*/i,
-      // German "kauft / kaufen / kauf / kauf von"
       /\bkauft\b/i,
       /\bkaufen\b/i,
       /\bgekauft\b/i,
       /\bkauf\s+von\b/i,
-      // Fusion
       /\bfusion\w*/i,
       /\bzusammenschluss\b/i,
       /\bmehrheits(?:antei|beteiligung)\w*/i,
+      /\bschluckt\b/i,
+      /\bbeteiligt\s+sich\s+(?:an|mit)/i,
     ],
     negate: [/\bdivest\w*/i, /\bsells?\s+(its|the)\s+\w+\s+(unit|division|business)/i],
     baseImpact: 24,
@@ -146,6 +164,7 @@ const KEYWORD_RULES: KeywordRule[] = [
   {
     type: 'gf_change',
     patterns: [
+      // Existing English + German basics
       /\bnew\s+(ceo|cto|cfo|coo|chief)\b/i,
       /\bappoint(s|ed|ment)\b/i,
       /\bernennt\s+\w+/i,
@@ -155,6 +174,23 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bführungswechsel\b/i,
       /\b(rücktritt|abberufung)\b/i,
       /\bfolgt\s+\w+\s+als\s+(ceo|cfo|cto|chef)/i,
+      // v2 additions: more German leadership change patterns
+      /\bwechsel\s+an\s+der\s+spitze/i,
+      /\bwechsel\s+im\s+(?:vorstand|management|führungsteam)/i,
+      /\bübergibt\s+an\b/i,
+      /\bübernimmt\s+(?:den\s+)?vorstand/i,
+      /\bübernimmt\s+(?:die\s+)?(?:geschäftsführung|leitung)/i,
+      /\bneue[rn]?\s+geschäftsführer\w*/i,
+      /\bneue[rn]?\s+ceo\b/i,
+      /\bneue\s+cfo\b/i,
+      /\bvorsitz(?:ende[rn]?|er)?\s+(?:wechsel|ändert|ändern)/i,
+      /\bgibt\s+(?:die\s+)?(?:führung|leitung|vorstand)\s+ab/i,
+      /\bnachfolge\s+(?:steht\s+fest|geregelt|geklärt)/i,
+      /\bsteht\s+nicht\s+mehr\s+zur\s+verfügung/i,
+      /\bverlässt\s+den\s+vorstand/i,
+      /\baufsichtsrat\s+(?:bestellt|beruft|benennt)/i,
+      /\binterimschef\w*/i,
+      /\bübergangschef\w*/i,
     ],
     baseImpact: 10,
     baseConfidence: 0.74,
@@ -166,6 +202,8 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bpatent\s+(filing|application|granted|filed)\b/i,
       /\bpatentanmeldung\b/i,
       /\bpatent\s+erteilt\b/i,
+      /\bschutzrecht\w*/i,
+      /\bgebrauchsmuster\b/i,
     ],
     baseImpact: 16,
     baseConfidence: 0.78,
@@ -185,6 +223,9 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bsammelt\s+(?:über|mehr\s+als|ca\.?)?\s*[\d.,]+\s*(mio|millionen|mrd|milliarden|m\b|bn\b)/i,
       /\binvestor\w*\s+(steig\w+\s+ein|über[a-z]+|investier\w+)/i,
       /\bkapitalerhöh\w+/i,
+      /\bschließt\s+(?:eine|seine)?\s*(?:series\s*[a-e]\s+|finanzierung\w+|runde)/i,
+      /\bfrisches\s+kapital/i,
+      /\bsicherte?\s+sich\s+\d/i,
     ],
     baseImpact: 22,
     baseConfidence: 0.86,
@@ -199,6 +240,15 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bramp(?:ing)?\s+up\s+hiring\b/i,
       /\bsucht\s+\d{2,}\s+(mitarbeitende|fachkräfte)/i,
       /\bschafft\s+\d{2,}\s+(stellen|jobs|arbeitsplätze)/i,
+      // v2 additions
+      /\bstellt\s+(?:hunderte|tausende|\d{2,})\s+(ein|mitarbeitende|fachkräfte)/i,
+      /\beinstellungsoffensive\b/i,
+      /\bpersonal\w*\s+aufbau\b/i,
+      /\baufbau\s+von\s+\d+\s+(?:stellen|arbeitsplätzen)/i,
+      /\bneue\s+arbeitsplätze\b/i,
+      /\bausbildungsoffensive\b/i,
+      /\bschafft\s+(?:hunderte|tausende)\s+(?:neue\s+)?stellen/i,
+      /\bstockt\s+(?:die\s+)?belegschaft\s+auf/i,
     ],
     baseImpact: 26,
     baseConfidence: 0.78,
@@ -212,6 +262,8 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bmitarbeiter[-\s]?(?:wachstum|zahl|aufbau)\b/i,
       /\bteam\s+grew\s+by\b/i,
       /\bbaut\s+\d{2,}\s+(mitarbeitende|stellen|fachkräfte)/i,
+      /\bbelegschaft\s+(?:wächst|aufbau)/i,
+      /\bpersonal\w*bestand\s+(?:steigt|wächst|wird\s+ausgebaut)/i,
     ],
     baseImpact: 20,
     baseConfidence: 0.74,
@@ -224,6 +276,8 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bunveil(?:s|ed|ing)\b/i,
       /\bstellt\s+\w+\s+vor\b/i,
       /\bmarkteinführung\b/i,
+      /\bvorgestellt\b/i,
+      /\bpräsentiert\s+\w+\b/i,
     ],
     baseImpact: 14,
     baseConfidence: 0.72,
@@ -235,6 +289,9 @@ const KEYWORD_RULES: KeywordRule[] = [
       /\bnew\s+(division|business unit|subsidiary)\b/i,
       /\b(neue[rs]?\s+)?geschäftsbereich\b/i,
       /\bspin-?off\b/i,
+      /\btochterunternehmen\s+gegründet/i,
+      /\bgründet\s+(?:neue\s+|eine\s+)?tochter/i,
+      /\bneue\s+sparte\b/i,
     ],
     baseImpact: 18,
     baseConfidence: 0.78,
@@ -246,8 +303,33 @@ const SEMANTIC_RULES: SemanticRule[] = [
   {
     type: 'location_expansion',
     groups: [
-      [/\bopens?\b/i, /\bopened\b/i, /\bopening\b/i, /\beröffn\w+/i, /\bnew\b/i, /\bzweite\b/i, /\bneue\b/i],
-      [/\boffice\b/i, /\bniederlassung\b/i, /\bstandort\b/i, /\bcampus\b/i, /\bhq\b/i, /\bheadquarter/i, /\bplant\b/i],
+      [
+        /\bopens?\b/i,
+        /\bopened\b/i,
+        /\bopening\b/i,
+        /\beröffn\w+/i,
+        /\bnew\b/i,
+        /\bzweite\b/i,
+        /\bneue\b/i,
+        /\berweiter\w+/i,
+        /\bvergrößer\w+/i,
+        /\bbaut\s+(?:auf|neu)/i,
+        /\bplant\s+(?:einen|eine|den|die)/i,
+      ],
+      [
+        /\boffice\b/i,
+        /\bniederlassung\b/i,
+        /\bstandort\b/i,
+        /\bcampus\b/i,
+        /\bhq\b/i,
+        /\bheadquarter/i,
+        /\bplant\b/i,
+        /\bwerk\b/i,
+        /\bzentrum\b/i,
+        /\bgigafactory\b/i,
+        /\bproduktionsstätte\b/i,
+        /\bbüro\b/i,
+      ],
     ],
     baseImpact: 20,
     baseConfidence: 0.80,
@@ -272,6 +354,17 @@ const SEMANTIC_RULES: SemanticRule[] = [
     baseImpact: 20,
     baseConfidence: 0.78,
     reason: 'Implicit funding (investor + currency amount)',
+  },
+  // v2: Insolvenz-fallback wenn nur "antrag" + "amtsgericht" etc.
+  {
+    type: 'insolvency',
+    groups: [
+      [/\bantrag\b/i, /\bverfahren\b/i, /\beröffnet\b/i],
+      [/\bamtsgericht\b/i, /\binsolvenzgericht\b/i, /\bvermögensverfall\b/i],
+    ],
+    baseImpact: -36,
+    baseConfidence: 0.85,
+    reason: 'Implicit insolvency (court proceedings)',
   },
 ];
 
@@ -313,7 +406,6 @@ export function classifySignal(
   const text = `${title}\n${description}`.trim();
   if (!text) return null;
 
-  // Layer 1 — Negative signals (highest priority)
   for (const rule of NEGATIVE_RULES) {
     const hits = evaluateKeywordRule(rule, text);
     if (hits) {
@@ -329,7 +421,6 @@ export function classifySignal(
     }
   }
 
-  // Layer 2 — Strong keywords
   for (const rule of KEYWORD_RULES) {
     const hits = evaluateKeywordRule(rule, text);
     if (hits) {
@@ -345,7 +436,6 @@ export function classifySignal(
     }
   }
 
-  // Layer 3 — Semantic context (multi-keyword co-occurrence)
   for (const rule of SEMANTIC_RULES) {
     const hits = evaluateSemanticRule(rule, text);
     if (hits) {
@@ -364,12 +454,6 @@ export function classifySignal(
   return null;
 }
 
-/**
- * Bulk classify with a soft fallback. If the classifier returns null,
- * yield a low-confidence `press_release` so callers don't lose the
- * record entirely. The fallback flag lets downstream surfaces filter
- * out un-classified noise if they want stricter input.
- */
 export interface ClassifyOptions {
   fallbackToPressRelease?: boolean;
   fallbackConfidence?: number;
