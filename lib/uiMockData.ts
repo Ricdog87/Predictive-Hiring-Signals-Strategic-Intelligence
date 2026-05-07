@@ -43,6 +43,7 @@ export const UI_WATCHLISTS: UIWatchlist[] = [
  * its content area — keeps the surface clean and click-driven.
  */
 export const TAB_IDS = [
+  "today",
   "companies",
   "sectors",
   "insolvenz",
@@ -62,6 +63,7 @@ export interface NavSection {
 }
 
 export const PRIMARY_NAV: NavSection[] = [
+  { id: "today",     label: "Today",     glyph: "◉", chord: "g t",  hint: "Heute · Movers · Watchlist · Insolvenz" },
   { id: "companies", label: "Companies", glyph: "◫", chord: "g co", hint: "Radar · Filter · Inspector" },
   { id: "sectors",   label: "Macro",     glyph: "▤", chord: "g s",  hint: "Sectors · Regions · DE Quadranten · Clusters" },
   { id: "insolvenz", label: "Insolvenz", glyph: "✖", chord: "g i",  hint: "Insolvenz + Restructuring · 30d" },

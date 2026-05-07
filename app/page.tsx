@@ -23,6 +23,7 @@ import { SectorIntelligencePanel } from "@/components/SectorIntelligencePanel";
 import { InsolvenzPulsePanel } from "@/components/InsolvenzPulsePanel";
 import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
 import { MarketClusterView } from "@/components/MarketClusterView";
+import { TodayPanel } from "@/components/TodayPanel";
 import {
   DashboardTabs,
   readPersistedTab,
@@ -104,7 +105,7 @@ const SIGNAL_TYPE_LABELS: Array<{ id: string; label: string }> = [
 ];
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("companies");
+  const [activeTab, setActiveTab] = useState<TabId>("today");
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData>(EMPTY);
@@ -164,6 +165,7 @@ export default function DashboardPage() {
   }, []);
 
   // Bloomberg-style chord nav now switches tabs instead of scrolling.
+  useChord("g t", () => setActiveTab("today"));
   useChord("g co", () => setActiveTab("companies"));
   useChord("g s", () => setActiveTab("sectors"));
   useChord("g i", () => setActiveTab("insolvenz"));
@@ -260,6 +262,24 @@ export default function DashboardPage() {
             {error && (
               <div className="mb-4 rounded-sm border border-accent-red/40 bg-accent-red/[0.06] px-3 py-2 font-mono text-[11px] text-accent-red">
                 api error · {error}
+              </div>
+            )}
+
+            {/* TODAY TAB */}
+            {activeTab === "today" && (
+              <div role="tabpanel" id="panel-today">
+                <ErrorBoundary section="Today">
+                  <TodayPanel
+                    companies={data.companies}
+                    sectors={data.sectors}
+                    newSignals24h={data.overview?.newSignals24h ?? 0}
+                    onSwitchTab={setActiveTab}
+                    onSelectCompany={(id) => {
+                      setSelectedId(id);
+                      setActiveTab("companies");
+                    }}
+                  />
+                </ErrorBoundary>
               </div>
             )}
 
