@@ -20,6 +20,7 @@ import { CompanyDetailPanel } from "@/components/CompanyDetailPanel";
 import { SignalTimeline } from "@/components/SignalTimeline";
 import { ForecastPanel } from "@/components/ForecastPanel";
 import { SectorIntelligencePanel } from "@/components/SectorIntelligencePanel";
+import { InsolvenzPulsePanel } from "@/components/InsolvenzPulsePanel";
 import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
 import { MarketClusterView } from "@/components/MarketClusterView";
 import {
@@ -281,6 +282,17 @@ export default function DashboardPage() {
               ) : (
                 <SectorIntelligencePanel sectors={data.sectors} />
               )}
+            </section>
+
+            <section id="section-insolvenz" className="mt-8 scroll-mt-24">
+              <SectionTitle
+                eyebrow="Insolvenz · Restructuring"
+                title="Insolvenz-Pulse · 30 Tage"
+                hint="Outplacement · Restructuring · Goldmine"
+              />
+              <ErrorBoundary section="Insolvenz Pulse">
+                <InsolvenzPulsePanel />
+              </ErrorBoundary>
             </section>
 
             <section id="section-sectors" className="mt-8 scroll-mt-24">
