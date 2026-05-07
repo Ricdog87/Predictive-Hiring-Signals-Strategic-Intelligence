@@ -34,6 +34,7 @@ import { ingestRecordToSignal, listIngest } from './ingestStore';
 import { fetchAllNews } from './newsFetcher';
 import { classifyNewsBatch, type ClassifiedNewsItem } from './newsClassifier';
 import { isVerifierConfigured, verifyDiscoveryBatch } from './openaiVerifier';
+import { discoverAllAnthropic } from './anthropicDiscovery';
 
 export type DataMode = 'auto' | 'live_only' | 'with_adapter';
 
@@ -316,13 +317,21 @@ export async function getSignals(): Promise<CompanySignal[]> {
   const mode = resolveDataMode();
 
   // Live sources run in parallel.
-  const [newsSignals, discoverySignals, ingestSignals] = await Promise.all([
-    getNewsSignals(),
-    getDiscoveredSignals(),
-    getIngestSignals(),
-  ]);
+  const [newsSignals, hermesDiscoverySignals, anthropicDiscoverySignals, ingestSignals] =
+    await Promise.all([
+      getNewsSignals(),
+      getDiscoveredSignals(),
+      // Anthropic-direct LLM-with-web-search across hiring + funding + M&A
+      // + expansion + leadership + insolvency. Independently cached (6h)
+      // and gated by ANTHROPIC_DISCOVERY_ENABLED. Failure is non-fatal.
+      discoverAllAnthropic().catch(() => [] as CompanySignal[]),
+      getIngestSignals(),
+    ]);
   const liveCount =
-    newsSignals.length + discoverySignals.length + ingestSignals.length;
+    newsSignals.length +
+    hermesDiscoverySignals.length +
+    anthropicDiscoverySignals.length +
+    ingestSignals.length;
 
   let adapterSignals: CompanySignal[] = [];
   const includeAdapter =
@@ -332,17 +341,48 @@ export async function getSignals(): Promise<CompanySignal[]> {
     adapterSignals = await getAdapterSignals();
   }
 
-  const seen = new Set<string>();
+  // Soft dedupe across sources: same canonical company + same signalType
+  // within ±7 days = treat as one event. The first-arriving source wins
+  // (priority order = news > engine discovery > anthropic discovery >
+  // ingest > adapter).
+  const seenIds = new Set<string>();
+  const seenEvents = new Map<string, number>();
   const merged: CompanySignal[] = [];
-  // Priority: news > discovery > ingest > adapter
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const eventKey = (s: CompanySignal): string => {
+    const rawName =
+      typeof s.meta?.companyName === 'string'
+        ? (s.meta.companyName as string)
+        : s.companyId;
+    const canon = rawName
+      .toLowerCase()
+      .replace(/[äöüß]/g, (c) =>
+        c === 'ä' ? 'ae' : c === 'ö' ? 'oe' : c === 'ü' ? 'ue' : 'ss'
+      )
+      .replace(
+        /\b(ag|gmbh|se|kgaa|kg|ohg|ug|holding|group|gruppe|inc|corp|ltd|plc)\b\.?/g,
+        ''
+      )
+      .replace(/[^a-z0-9]+/g, '')
+      .trim();
+    return `${canon}|${s.signalType}`;
+  };
   for (const sig of [
     ...newsSignals,
-    ...discoverySignals,
+    ...hermesDiscoverySignals,
+    ...anthropicDiscoverySignals,
     ...ingestSignals,
     ...adapterSignals,
   ]) {
-    if (seen.has(sig.id)) continue;
-    seen.add(sig.id);
+    if (seenIds.has(sig.id)) continue;
+    seenIds.add(sig.id);
+    const key = eventKey(sig);
+    const ts = Date.parse(sig.observedAt);
+    const prev = seenEvents.get(key);
+    if (prev !== undefined && Math.abs(prev - ts) <= SEVEN_DAYS_MS) {
+      continue;
+    }
+    seenEvents.set(key, ts);
     merged.push(sig);
   }
   return merged;
@@ -394,20 +434,27 @@ export async function describeDataPath(): Promise<{
   mode: DataMode;
   news: number;
   discovery: number;
+  anthropicDiscovery: number;
   ingest: number;
   adapter: number;
   effectivePath: string;
   discoveryEnabled: boolean;
   discoveryCacheAgeSec: number | null;
+  anthropicDiscoveryEnabled: boolean;
 }> {
   const mode = resolveDataMode();
-  const [newsSignals, discoverySignals, ingestSignals] = await Promise.all([
-    getNewsSignals(),
-    getDiscoveredSignals(),
-    getIngestSignals(),
-  ]);
+  const [newsSignals, discoverySignals, anthropicSignals, ingestSignals] =
+    await Promise.all([
+      getNewsSignals(),
+      getDiscoveredSignals(),
+      discoverAllAnthropic().catch(() => [] as CompanySignal[]),
+      getIngestSignals(),
+    ]);
   const liveCount =
-    newsSignals.length + discoverySignals.length + ingestSignals.length;
+    newsSignals.length +
+    discoverySignals.length +
+    anthropicSignals.length +
+    ingestSignals.length;
   const includeAdapter =
     mode === 'with_adapter' ||
     (mode === 'auto' && liveCount < ADAPTER_SUPPRESS_THRESHOLD);
@@ -416,16 +463,23 @@ export async function describeDataPath(): Promise<{
   const cache = globalForDiscovery.__rsgDiscoveryCache;
   const cacheAge = cache ? Math.round((Date.now() - cache.fetchedAt) / 1000) : null;
 
+  const anthropicEnabled =
+    (process.env.ANTHROPIC_DISCOVERY_ENABLED ?? 'false').toLowerCase() === 'true';
+
+  const summary = `news=${newsSignals.length} discovery=${discoverySignals.length} anthropic=${anthropicSignals.length} ingest=${ingestSignals.length}`;
+
   return {
     mode,
     news: newsSignals.length,
     discovery: discoverySignals.length,
+    anthropicDiscovery: anthropicSignals.length,
     ingest: ingestSignals.length,
     adapter: adapterCount,
     effectivePath: includeAdapter
-      ? `news=${newsSignals.length} discovery=${discoverySignals.length} ingest=${ingestSignals.length} adapter=${adapterCount}`
-      : `news=${newsSignals.length} discovery=${discoverySignals.length} ingest=${ingestSignals.length} (adapter suppressed, live=${liveCount})`,
+      ? `${summary} adapter=${adapterCount}`
+      : `${summary} (adapter suppressed, live=${liveCount})`,
     discoveryEnabled: DISCOVERY_ENABLED,
     discoveryCacheAgeSec: cacheAge,
+    anthropicDiscoveryEnabled: anthropicEnabled,
   };
 }

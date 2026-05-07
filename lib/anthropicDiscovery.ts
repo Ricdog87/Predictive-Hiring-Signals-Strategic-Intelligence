@@ -1,17 +1,23 @@
 /**
- * Direct Anthropic discovery layer — fills data gaps the RSS classifier
- * leaves open. Specifically targets DACH insolvency / restructuring
- * events using Claude with the web_search server tool.
+ * Direct LLM-with-web-search discovery layer.
  *
- * Architecture choice:
- *   - This is intentionally *not* routed through the engine proxy.
- *     Claude is a parallel data source, like Sonar but with stronger
- *     reasoning and citation hygiene.
- *   - Cached aggressively (6h) — insolvency events are slow-moving
- *     and the call is the most expensive in the stack ($0.10–0.20).
- *   - Whitelabel-clean: vendor strings live only in env vars and
- *     internal logs. The CompanySignal surface stays neutral —
- *     `provider: 'rsg-discovery'`, no Anthropic/Claude references.
+ * Two missions, both opt-in via ANTHROPIC_DISCOVERY_ENABLED=true:
+ *
+ *   1. Insolvenz + Restructuring (negative signals — Outplacement plays)
+ *   2. Hiring + Funding + M&A + Expansion + Leadership (positive signals
+ *      — active recruiting opportunities)
+ *
+ * Each mission caches independently (6h). Whitelabel-clean: every
+ * vendor identifier lives only in env vars and internal logs.
+ * The CompanySignal surface stays neutral: provider='rsg-discovery'.
+ *
+ * Architectural notes:
+ *   - Not routed through the engine proxy. Claude is a parallel data
+ *     source — like Sonar, but with stronger reasoning + citation
+ *     hygiene. We use the web_search server tool so Claude grounds
+ *     each event in real reportable URLs.
+ *   - Hard timeout (60s) — never blocks the dashboard.
+ *   - Trust-on-failure: any error → empty list, callers stay drop-in.
  */
 
 import type { CompanySignal, HiringSignalType } from './types';
@@ -20,17 +26,7 @@ const ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const TIMEOUT_MS = 60_000;
 const CACHE_MS = 6 * 60 * 60 * 1000; // 6h
 
-interface DiscoveryEvent {
-  company: string;
-  industry?: string;
-  bundeslandCode?: string;
-  city?: string;
-  eventType: 'insolvency' | 'restructuring';
-  observedAt: string;
-  source?: string;
-  affected?: number;
-  description?: string;
-}
+// ─── shared types ───────────────────────────────────────────────────
 
 interface CacheEntry {
   data: CompanySignal[];
@@ -39,7 +35,7 @@ interface CacheEntry {
 }
 
 const globalForCache = globalThis as unknown as {
-  __rsgAnthropicInsolvCache?: CacheEntry;
+  __rsgAnthropicCache?: Record<string, CacheEntry>;
 };
 
 interface DiscoveryConfig {
@@ -71,7 +67,47 @@ export function isAnthropicDiscoveryConfigured(): boolean {
   return cfg.enabled && cfg.apiKey.length > 0;
 }
 
-const SYSTEM_PROMPT = `Du bist ein DACH-Region (Deutschland, Österreich, Schweiz) Business-Intelligence-Agent für Headhunter und Outplacement-Berater. Du nutzt das web_search Tool um aktuelle Insolvenzanträge, Insolvenzverfahren und Restrukturierungs-Ankündigungen zu finden.
+// ─── mission definitions ────────────────────────────────────────────
+
+interface RawEvent {
+  company: string;
+  industry?: string;
+  bundeslandCode?: string;
+  city?: string;
+  signalType: HiringSignalType;
+  observedAt?: string;
+  source?: string;
+  affected?: number;
+  description?: string;
+}
+
+interface Mission {
+  /** Cache slot. */
+  key: string;
+  /** Used to prefix the generated CompanySignal id. */
+  idPrefix: string;
+  /** System prompt. The user prompt is generic. */
+  system: (cfg: DiscoveryConfig) => string;
+  /** Whitelist of allowed signalType strings the model may emit. */
+  allowedTypes: ReadonlySet<HiringSignalType>;
+  /**
+   * Map (signalType, hasAffected) → impact (-100..100).
+   * Mirrors the weights used elsewhere so derived hiring scores are
+   * consistent with classifier-derived signals.
+   */
+  impactFor: (e: RawEvent) => number;
+  /** Confidence baseline; per-event metadata may bump it later. */
+  baseConfidence: number;
+}
+
+const INSOLVENZ_MISSION: Mission = {
+  key: 'insolvenz',
+  idPrefix: 'rsg-disc-i',
+  allowedTypes: new Set<HiringSignalType>(['insolvency', 'restructuring']),
+  baseConfidence: 0.65,
+  impactFor: (e) => (e.signalType === 'insolvency' ? -85 : -55),
+  system: (cfg) =>
+    `Du bist ein DACH-Region (Deutschland, Österreich, Schweiz) Business-Intelligence-Agent für Headhunter und Outplacement-Berater. Du nutzt das web_search Tool um aktuelle Insolvenzanträge, Insolvenzverfahren und Restrukturierungs-Ankündigungen der letzten ${cfg.windowDays} Tage zu finden.
 
 Output: NUR ein einzelnes JSON-Objekt, keine Prosa, keine Markdown-Codeblöcke. Schema:
 {
@@ -79,9 +115,9 @@ Output: NUR ein einzelnes JSON-Objekt, keine Prosa, keine Markdown-Codeblöcke. 
     {
       "company": "Canonical company name",
       "industry": "Industry / sector (German)",
-      "bundeslandCode": "Two-letter DE state code (BY/NW/BW/HE/SN/...) or null",
+      "bundeslandCode": "Two-letter DE state code (BY/NW/BW/HE/SN/HH/BE/...) or null",
       "city": "Headquarters city",
-      "eventType": "insolvency" | "restructuring",
+      "signalType": "insolvency" | "restructuring",
       "observedAt": "YYYY-MM-DD",
       "source": "Real URL of reporting source",
       "affected": 1200,
@@ -91,18 +127,112 @@ Output: NUR ein einzelnes JSON-Objekt, keine Prosa, keine Markdown-Codeblöcke. 
 }
 
 Regeln:
-- Nutze mindestens 3 unterschiedliche Quellen pro Suche.
-- Priorisiere offizielle Bundesanzeiger / insolvenzbekanntmachungen.de und Tier-1 Wires (Handelsblatt, manager-magazin, Tagesschau, FAZ, Reuters DE).
+- Mindestens 3 unterschiedliche Quellen pro Suche.
+- Priorisiere Bundesanzeiger / insolvenzbekanntmachungen.de und Tier-1 Wires (Handelsblatt, manager-magazin, Tagesschau, FAZ, Reuters DE).
 - Erfinde NICHTS. Wenn nichts gefunden: { "events": [] }.
 - Nur DACH-Region.
 - "insolvency" für Insolvenzanträge / Insolvenzverfahren.
-- "restructuring" für Stellenabbau / Restrukturierungs-Ankündigungen.`;
+- "restructuring" für Stellenabbau / Restrukturierungs-Ankündigungen mit Zahlen.
+- Maximal ${cfg.maxEvents} Events.`,
+};
 
-async function callDiscovery(cfg: DiscoveryConfig): Promise<DiscoveryEvent[]> {
+const HIRING_MISSION: Mission = {
+  key: 'hiring',
+  idPrefix: 'rsg-disc-h',
+  allowedTypes: new Set<HiringSignalType>([
+    'job_spike',
+    'employee_growth',
+    'funding_grant',
+    'mna_buy',
+    'mna_sell',
+    'location_expansion',
+    'new_business_unit',
+    'product_launch',
+    'gf_change',
+    'patent_filing',
+  ]),
+  baseConfidence: 0.6,
+  impactFor: (e) => {
+    switch (e.signalType) {
+      case 'job_spike':
+        return Math.min(80, 30 + (e.affected ?? 0) / 50);
+      case 'employee_growth':
+        return 55;
+      case 'funding_grant':
+        return Math.min(90, 50 + Math.log10(Math.max(1, e.affected ?? 1)) * 8);
+      case 'mna_buy':
+        return 70;
+      case 'mna_sell':
+        return -25;
+      case 'location_expansion':
+        return 50;
+      case 'new_business_unit':
+        return 60;
+      case 'product_launch':
+        return 35;
+      case 'gf_change':
+        return 30;
+      case 'patent_filing':
+        return 20;
+      default:
+        return 25;
+    }
+  },
+  system: (cfg) =>
+    `Du bist ein DACH-Business-Intelligence-Agent für Personaldienstleister. Mission: Finde aktuelle Wachstums- und Hiring-Signale deutschlandweit (mit Österreich + Schweiz) der letzten ${cfg.windowDays} Tage. Nutze das web_search Tool und priorisiere Quellen mit messbaren Zahlen.
+
+Zielsignale (signalType-Werte):
+- "job_spike"            (Hiring-Welle / "X neue Stellen / 1.000 Mitarbeiter gesucht")
+- "employee_growth"      (Headcount-Wachstum, Personaloffensive)
+- "funding_grant"        (Series A/B/C/D, Förderung, Bundeszuschuss — affected = $/€ in Mio)
+- "mna_buy"              (Übernahme: Käufer-Seite)
+- "mna_sell"             (Übernahme: Target-Seite)
+- "location_expansion"   (Standorteröffnung, neuer Hub)
+- "new_business_unit"    (Neues BU / Spin-off / Tochter)
+- "product_launch"       (Wesentlicher Launch)
+- "gf_change"            (Geschäftsführer / C-Level / Vorstandswechsel)
+- "patent_filing"        (Substanzielle Patent-Aktivität)
+
+Output: NUR ein einzelnes JSON-Objekt, keine Prosa. Schema:
+{
+  "events": [
+    {
+      "company": "Canonical company name",
+      "industry": "Industry / sector (German)",
+      "bundeslandCode": "Two-letter DE state code (BY/NW/BW/HE/SN/HH/BE/RP/SH/NI/BB/MV/SL/ST/TH) or AT/CH or null",
+      "city": "Headquarters city",
+      "signalType": "<one of the 10 above>",
+      "observedAt": "YYYY-MM-DD",
+      "source": "Real URL of reporting source",
+      "affected": 250,
+      "description": "Short German description, max 140 chars"
+    }
+  ]
+}
+
+Quellen-Priorität:
+- Tier 1: Handelsblatt, manager-magazin, FAZ, Tagesschau, Süddeutsche, Reuters DE, Bloomberg DE
+- Tier 2: WirtschaftsWoche, deutsche-startups.de, Börse-Online, finanzen.net, t3n
+- Tier 3: Pressemitteilungen direkt von Unternehmen (newsroom)
+
+Regeln:
+- Mindestens 4 unterschiedliche Quellen verteilt über die Suchen.
+- Erfinde NICHTS. Bei Unsicherheit: weglassen.
+- Bevorzuge Mid-Cap & Mittelstand (50–10.000 MA), nicht nur DAX.
+- "affected" ist eine Zahl: bei Hiring = Anzahl Stellen, bei Funding = Mio €/$, bei M&A = Deal-Volumen Mio €.
+- Maximal ${cfg.maxEvents} Events. Diversifiziere über Branchen.
+- Mindestens 5 verschiedene Bundesländer wenn möglich.`,
+};
+
+// ─── core call ──────────────────────────────────────────────────────
+
+async function callMission(
+  mission: Mission,
+  cfg: DiscoveryConfig
+): Promise<RawEvent[]> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const userPrompt = `Finde DACH-Insolvenzen und Restrukturierungen der letzten ${cfg.windowDays} Tage. Maximal ${cfg.maxEvents} Events. Fokus: Mitarbeiter-Abbau-relevant.`;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
       signal: ctrl.signal,
@@ -113,8 +243,8 @@ async function callDiscovery(cfg: DiscoveryConfig): Promise<DiscoveryEvent[]> {
       },
       body: JSON.stringify({
         model: cfg.model,
-        max_tokens: 4_000,
-        system: SYSTEM_PROMPT,
+        max_tokens: 6_000,
+        system: mission.system(cfg),
         tools: [
           {
             type: 'web_search_20250305',
@@ -122,13 +252,18 @@ async function callDiscovery(cfg: DiscoveryConfig): Promise<DiscoveryEvent[]> {
             max_uses: cfg.maxSearches,
           },
         ],
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [
+          {
+            role: 'user',
+            content: `Suche jetzt. Liefere bis zu ${cfg.maxEvents} Events der letzten ${cfg.windowDays} Tage als JSON.`,
+          },
+        ],
       }),
     });
     if (!res.ok) {
       // eslint-disable-next-line no-console
       console.warn(
-        `[discovery] http ${res.status}: ${(await res
+        `[discovery:${mission.key}] http ${res.status}: ${(await res
           .text()
           .catch(() => ''))
           .slice(0, 200)}`
@@ -138,8 +273,6 @@ async function callDiscovery(cfg: DiscoveryConfig): Promise<DiscoveryEvent[]> {
     const data = (await res.json()) as {
       content?: Array<{ type: string; text?: string }>;
     };
-    // The API emits tool_use + tool_result + final text blocks. The
-    // JSON we want is in the trailing text — collect last text block.
     const textBlocks = (data.content ?? []).filter(
       (b): b is { type: 'text'; text: string } =>
         b.type === 'text' && typeof b.text === 'string'
@@ -147,7 +280,7 @@ async function callDiscovery(cfg: DiscoveryConfig): Promise<DiscoveryEvent[]> {
     const last = textBlocks[textBlocks.length - 1]?.text?.trim();
     if (!last) return [];
     const cleaned = last.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
-    let parsed: { events?: DiscoveryEvent[] };
+    let parsed: { events?: RawEvent[] };
     try {
       parsed = JSON.parse(cleaned) as typeof parsed;
     } catch {
@@ -160,17 +293,22 @@ async function callDiscovery(cfg: DiscoveryConfig): Promise<DiscoveryEvent[]> {
           e &&
           typeof e.company === 'string' &&
           e.company.trim().length > 0 &&
-          (e.eventType === 'insolvency' || e.eventType === 'restructuring')
+          mission.allowedTypes.has(e.signalType)
       )
       .slice(0, cfg.maxEvents);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn('[discovery] call failed', (err as Error).message);
+    console.warn(
+      `[discovery:${mission.key}] call failed`,
+      (err as Error).message
+    );
     return [];
   } finally {
     clearTimeout(timer);
   }
 }
+
+// ─── helpers ────────────────────────────────────────────────────────
 
 function slugify(s: string): string {
   return s
@@ -183,9 +321,11 @@ function slugify(s: string): string {
     .slice(0, 60);
 }
 
-function eventToSignal(e: DiscoveryEvent, idx: number): CompanySignal {
-  const signalType: HiringSignalType =
-    e.eventType === 'insolvency' ? 'insolvency' : 'restructuring';
+function eventToSignal(
+  mission: Mission,
+  e: RawEvent,
+  idx: number
+): CompanySignal {
   const slug = slugify(e.company);
   const observed = e.observedAt
     ? (() => {
@@ -197,15 +337,15 @@ function eventToSignal(e: DiscoveryEvent, idx: number): CompanySignal {
       })()
     : new Date().toISOString();
   return {
-    id: `rsg-disc-${slug || `i${idx}`}-${signalType}`,
+    id: `${mission.idPrefix}-${slug || `x${idx}`}-${e.signalType}`,
     companyId: slug || `discovered-${idx}`,
     provider: 'rsg-discovery',
-    signalType,
-    impact: signalType === 'insolvency' ? -85 : -55,
-    confidence: 0.65,
+    signalType: e.signalType,
+    impact: Math.round(mission.impactFor(e)),
+    confidence: mission.baseConfidence,
     observedAt: observed,
     meta: {
-      title: e.description ?? `${e.company} — ${signalType}`,
+      title: e.description ?? `${e.company} — ${e.signalType}`,
       description: e.description ?? '',
       source: e.source ?? 'rsg-discovery',
       url: e.source ?? '',
@@ -219,27 +359,48 @@ function eventToSignal(e: DiscoveryEvent, idx: number): CompanySignal {
   };
 }
 
-/**
- * Public API. Returns CompanySignal[] in the same shape as the rest
- * of the pipeline so callers can merge results without translation.
- * No-op when disabled or unconfigured.
- */
-export async function discoverInsolvenzAnthropic(): Promise<CompanySignal[]> {
+async function runMission(mission: Mission): Promise<CompanySignal[]> {
   const cfg = readConfig();
   if (!cfg.enabled || !cfg.apiKey) return [];
 
+  const cache =
+    globalForCache.__rsgAnthropicCache ??
+    (globalForCache.__rsgAnthropicCache = {});
   const now = Date.now();
-  const cached = globalForCache.__rsgAnthropicInsolvCache;
-  if (cached && cached.expiresAt > now) {
-    return cached.data;
+  const hit = cache[mission.key];
+  if (hit && hit.expiresAt > now) {
+    return hit.data;
   }
-
-  const events = await callDiscovery(cfg);
-  const signals = events.map(eventToSignal);
-  globalForCache.__rsgAnthropicInsolvCache = {
+  const events = await callMission(mission, cfg);
+  const signals = events.map((e, i) => eventToSignal(mission, e, i));
+  cache[mission.key] = {
     data: signals,
     expiresAt: now + CACHE_MS,
     fetchedAt: now,
   };
   return signals;
+}
+
+// ─── public API ─────────────────────────────────────────────────────
+
+/** Insolvenz + Restructuring focus — used by /api/insolvenz-pulse. */
+export function discoverInsolvenzAnthropic(): Promise<CompanySignal[]> {
+  return runMission(INSOLVENZ_MISSION);
+}
+
+/** Hiring + funding + M&A + expansion + leadership — fed into the
+ *  global signal pool used by Companies / Sectors / Regions / Today. */
+export function discoverHiringAnthropic(): Promise<CompanySignal[]> {
+  return runMission(HIRING_MISSION);
+}
+
+/** Combined feed — both missions run in parallel, returned merged. */
+export async function discoverAllAnthropic(): Promise<CompanySignal[]> {
+  const cfg = readConfig();
+  if (!cfg.enabled || !cfg.apiKey) return [];
+  const [insolvenz, hiring] = await Promise.all([
+    discoverInsolvenzAnthropic().catch(() => [] as CompanySignal[]),
+    discoverHiringAnthropic().catch(() => [] as CompanySignal[]),
+  ]);
+  return [...insolvenz, ...hiring];
 }
