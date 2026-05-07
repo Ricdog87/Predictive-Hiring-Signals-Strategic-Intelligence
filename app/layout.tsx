@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,6 +46,21 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+/**
+ * Plausible Analytics — DSGVO-konform, cookie-frei, EU-gehostet.
+ *
+ * Aktivierung via env:
+ *   NEXT_PUBLIC_PLAUSIBLE_DOMAIN=rsg-radar.vercel.app
+ *   NEXT_PUBLIC_PLAUSIBLE_SCRIPT=https://plausible.io/js/script.js   (optional)
+ *
+ * Wenn Domain nicht gesetzt → Script wird nicht geladen (kein Tracking).
+ * outbound-links + file-downloads + tagged-events plugins aktiv.
+ */
+const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "";
+const PLAUSIBLE_SCRIPT =
+  process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT ||
+  "https://plausible.io/js/script.outbound-links.tagged-events.js";
+
 export default function RootLayout({
   children,
 }: {
@@ -63,6 +79,19 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
+        {PLAUSIBLE_DOMAIN ? (
+          <>
+            <Script
+              defer
+              data-domain={PLAUSIBLE_DOMAIN}
+              src={PLAUSIBLE_SCRIPT}
+              strategy="afterInteractive"
+            />
+            <Script id="plausible-init" strategy="afterInteractive">
+              {`window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }`}
+            </Script>
+          </>
+        ) : null}
       </head>
       <body className="bg-bg-base text-text-primary font-sans antialiased">
         {children}
