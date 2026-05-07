@@ -224,11 +224,36 @@ export function aggregateRegional({
   const grouped = new Map<string, CompanyAggregate[]>();
   let unclassified = 0;
   for (const agg of aggregates) {
-    const masterRecord = getMasterRecordById(agg.company.id);
-    const land =
-      resolveBundesland(agg.company.headquarters) ??
-      resolveBundesland(masterRecord?.headquarters) ??
-      resolveBundesland(agg.company.name);
+    // v2 fix · check signal.meta first (discovery_dach + classifier signals
+    // carry concrete `bundesland` codes + `headquarters` cities directly).
+    let land: BundeslandRecord | undefined;
+    for (const sig of agg.signals) {
+      const meta = (sig as { meta?: { bundesland?: string; headquarters?: string } }).meta;
+      if (!meta) continue;
+      if (meta.bundesland) {
+        const code = String(meta.bundesland).toUpperCase().trim();
+        const found = BUNDESLAENDER.find((b) => b.code === code);
+        if (found) {
+          land = found;
+          break;
+        }
+      }
+      if (meta.headquarters) {
+        const resolved = resolveBundesland(meta.headquarters);
+        if (resolved) {
+          land = resolved;
+          break;
+        }
+      }
+    }
+    // Fallback chain: company.headquarters -> master record -> company name
+    if (!land) {
+      const masterRecord = getMasterRecordById(agg.company.id);
+      land =
+        resolveBundesland(agg.company.headquarters) ??
+        resolveBundesland(masterRecord?.headquarters) ??
+        resolveBundesland(agg.company.name);
+    }
     if (!land) {
       unclassified++;
       continue;
