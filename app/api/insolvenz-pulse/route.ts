@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getCompanies, getSignals } from '../../../lib/mockData';
 import { resolveBundesland } from '../../../lib/germanRegions';
+import { discoverInsolvenzAnthropic } from '../../../lib/anthropicDiscovery';
 import type { CompanySignal, CompanyProfile, HiringSignalType } from '../../../lib/types';
 
 export const runtime = 'nodejs';
@@ -38,8 +39,20 @@ interface InsolvenzResp {
     insolvencies: number;
     restructurings: number;
     byBundesland: Array<{ code: string; name: string; count: number }>;
+    sources: { classifier: number; discovery: number };
   };
   data: InsolvenzItem[];
+}
+
+function canonicalKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[äöüß]/g, (ch) =>
+      ch === 'ä' ? 'ae' : ch === 'ö' ? 'oe' : ch === 'ü' ? 'ue' : 'ss'
+    )
+    .replace(/\b(ag|gmbh|se|kgaa|kg|ohg|ug|holding|group|gruppe|inc|corp|ltd|plc)\b\.?/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
 }
 
 function metaString(
@@ -87,26 +100,47 @@ export async function GET(req: NextRequest) {
     Number.isFinite(rawWindow) && rawWindow > 0
       ? Math.min(MAX_WINDOW_DAYS, Math.max(1, Math.floor(rawWindow)))
       : DEFAULT_WINDOW_DAYS;
-  const [companies, signals] = await Promise.all([
+  const [companies, signals, discoverySignals] = await Promise.all([
     getCompanies(),
     getSignals(),
+    discoverInsolvenzAnthropic().catch(() => [] as CompanySignal[]),
   ]);
   const companyById = new Map(companies.map((c) => [c.id, c]));
   const cutoff = Date.now() - windowDays * DAY_MS;
 
+  // Merge classifier-derived + discovery-derived signals. Dedupe rule:
+  // same canonical company key + same signalType + within 7 days of
+  // each other → treat as one event, prefer the classifier hit (it has
+  // a known companyId / canonical metadata). Keep both sources counted
+  // so the summary can attribute coverage.
+  let classifierCount = 0;
+  let discoveryCount = 0;
+  const seen = new Map<string, number>();
   const items: InsolvenzItem[] = [];
-  for (const s of signals) {
-    if (!TARGET_TYPES.includes(s.signalType)) continue;
+
+  const ingest = (s: CompanySignal, origin: 'classifier' | 'discovery') => {
+    if (!TARGET_TYPES.includes(s.signalType)) return;
     const observed = Date.parse(s.observedAt);
-    if (Number.isNaN(observed) || observed < cutoff) continue;
+    if (Number.isNaN(observed) || observed < cutoff) return;
 
     const company = companyById.get(s.companyId);
     const land = resolveLand(s, company);
+    const name =
+      company?.name ?? metaString(s.meta, 'companyName') ?? s.companyId;
+    const dedupKey = `${canonicalKey(name)}|${s.signalType}`;
+    const prevTs = seen.get(dedupKey);
+    if (prevTs !== undefined && Math.abs(prevTs - observed) <= 7 * DAY_MS) {
+      return;
+    }
+    seen.set(dedupKey, observed);
+
+    if (origin === 'classifier') classifierCount++;
+    else discoveryCount++;
 
     items.push({
       signalId: s.id,
       companyId: s.companyId,
-      companyName: company?.name ?? metaString(s.meta, 'companyName') ?? s.companyId,
+      companyName: name,
       industry: company?.industry ?? metaString(s.meta, 'industry') ?? '—',
       bundeslandCode: land.code,
       bundeslandName: land.name,
@@ -119,7 +153,11 @@ export async function GET(req: NextRequest) {
       source: metaString(s.meta, 'source', 'provider'),
       url: metaString(s.meta, 'url', 'link'),
     });
-  }
+  };
+
+  // Classifier first — it's the higher-trust source (RSS-grounded).
+  for (const s of signals) ingest(s, 'classifier');
+  for (const s of discoverySignals) ingest(s, 'discovery');
 
   items.sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt));
 
@@ -142,7 +180,12 @@ export async function GET(req: NextRequest) {
     count: items.length,
     windowDays,
     generatedAt: new Date().toISOString(),
-    summary: { insolvencies, restructurings, byBundesland },
+    summary: {
+      insolvencies,
+      restructurings,
+      byBundesland,
+      sources: { classifier: classifierCount, discovery: discoveryCount },
+    },
     data: items,
   };
   return Response.json(body);
