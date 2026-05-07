@@ -33,6 +33,7 @@ import { computeHiringScore, predictHiring } from './scoring';
 import { ingestRecordToSignal, listIngest } from './ingestStore';
 import { fetchAllNews } from './newsFetcher';
 import { classifyNewsBatch, type ClassifiedNewsItem } from './newsClassifier';
+import { isVerifierConfigured, verifyDiscoveryBatch } from './openaiVerifier';
 
 export type DataMode = 'auto' | 'live_only' | 'with_adapter';
 
@@ -245,12 +246,19 @@ async function getDiscoveredSignals(): Promise<CompanySignal[]> {
     return cached.data;
   }
   const fresh = await callHermesDiscovery();
+  // Cross-verify high-confidence signals through OpenAI as an
+  // independent second opinion. No-op when OPENAI_VERIFIER_ENABLED!=true.
+  // Failures inside the verifier are non-fatal — discovery results pass
+  // through unchanged if anything goes wrong.
+  const verified = isVerifierConfigured()
+    ? await verifyDiscoveryBatch(fresh).catch(() => fresh)
+    : fresh;
   globalForDiscovery.__rsgDiscoveryCache = {
-    data: fresh,
+    data: verified,
     expiresAt: now + DISCOVERY_CACHE_MS,
     fetchedAt: now,
   };
-  return fresh;
+  return verified;
 }
 
 // -----------------------------------------------------------------------------
