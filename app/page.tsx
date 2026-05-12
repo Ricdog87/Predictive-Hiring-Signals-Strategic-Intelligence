@@ -115,6 +115,7 @@ export default function DashboardPage() {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [researchQuery, setResearchQuery] = useState<string | null>(null);
+  const [engineModalOpen, setEngineModalOpen] = useState(false);
   const user = useMemo(() => getSessionUser(), []);
   const sourcesOnline = useMemo(
     () => DATA_SOURCES.filter((s) => s.status === "live").length,
@@ -182,6 +183,7 @@ export default function DashboardPage() {
   useChord("g f", () => setActiveTab("forecast"));
   useChord("g b", () => setActiveTab("briefing"));
   useChord("g l", () => setActiveTab("strategy-lab"));
+  useChord("g e", () => setEngineModalOpen(true));
 
   const sectorOptions = useMemo(
     () => data.sectors.map((s) => s.sector),
@@ -512,6 +514,8 @@ export default function DashboardPage() {
             latencyMs={latencyMs}
             lastSyncAt={lastSyncAt}
             apiOk={!error}
+            engineModalOpen={engineModalOpen}
+            onEngineModalOpenChange={setEngineModalOpen}
           />
         </div>
       </div>

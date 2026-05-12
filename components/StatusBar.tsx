@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EngineStatusWidget } from "@/components/admin";
 
 interface StatusBarProps {
   /** ms latency of the last successful API roundtrip. */
@@ -9,6 +10,9 @@ interface StatusBarProps {
   lastSyncAt?: string | null;
   /** Currently active API endpoint count or status. */
   apiOk?: boolean;
+  /** Parent-driven force-open hook for the Engine Status modal (hotkey g e). */
+  engineModalOpen?: boolean;
+  onEngineModalOpenChange?: (open: boolean) => void;
 }
 
 function relTime(iso: string): string {
@@ -27,6 +31,8 @@ export function StatusBar({
   latencyMs,
   lastSyncAt,
   apiOk = true,
+  engineModalOpen,
+  onEngineModalOpenChange,
 }: StatusBarProps) {
   const [tick, setTick] = useState(0);
   // re-render every 10s so "Xm ago" stays fresh
@@ -73,6 +79,10 @@ export function StatusBar({
       </div>
 
       <div className="flex items-center gap-3">
+        <EngineStatusWidget
+          forceOpen={engineModalOpen}
+          onOpenChange={onEngineModalOpenChange}
+        />
         <span className="hidden md:flex items-center gap-1.5">
           <span className="kbd">⌘</span>
           <span className="kbd">K</span>
