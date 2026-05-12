@@ -402,11 +402,13 @@ function ConfidenceLegend({
 function StatusDot({
   status,
 }: {
-  status: "live" | "idle" | "mock" | "down";
+  status: "live" | "pending" | "idle" | "mock" | "down";
 }) {
   const color =
     status === "live"
       ? "bg-accent-green"
+      : status === "pending"
+      ? "bg-accent-cyan"
       : status === "idle"
       ? "bg-accent-amber"
       : status === "down"

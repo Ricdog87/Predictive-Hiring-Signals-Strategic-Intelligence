@@ -99,3 +99,15 @@ Wird live aus `CompanyAggregate`-Signalen aggregiert (`lib/marketView.ts:151`). 
 | Adzuna | Free Tier (1k Calls/Monat reichen) | 0 |
 
 Effektiv landet die PR auf **3-5 € / Monat** Worst-Case, gut innerhalb des 3-10 €-Budgets.
+
+## Deferred · Patent-Signals-Live-Anbindung
+
+Die Patent-Klassifizierung über Keyword-Match (DPMA / EPO / WIPO als Suchstring) bleibt aktiv. Ein **aktiver Registry-Fetch** wird in diesem PR bewusst NICHT umgesetzt:
+
+| Quelle | Status | Aufwand |
+|---|---|---|
+| DEPATIS / depatisnet.dpma.de | HTML-Scraping nötig — kein offizielles JSON-API | Mittel (eigener PR) |
+| Google Patents API | Abgeschaltet | – |
+| EPO Open Patent Services (OPS) | Kostenlose API, 5 k Calls / Monat, Registrierung nötig | Klein (eigener PR) |
+
+In `lib/uiMockData.ts` ist `patent_signals.status` von `idle` auf `pending` gewechselt mit einem expliziten Note-Feld — Sidebar zeigt nicht mehr „IDLE" sondern „PENDING" als Diagnostik. Echte Anbindung kommt in einem Folge-PR.
