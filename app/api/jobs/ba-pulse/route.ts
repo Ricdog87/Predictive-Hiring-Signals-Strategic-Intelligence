@@ -21,6 +21,7 @@ import {
   BA_CATEGORY_QUERIES,
 } from '@/lib/bundesagenturAdapter';
 import type { JobCategoryId, CategorySnapshot, AggregatedJobRow } from '@/lib/jobMarketTypes';
+import { filterB2BEmployers, isPersonaldienstleister } from '@/lib/employerFilters';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,12 +35,18 @@ interface BaPulseResponse {
   errors: Array<{ category: JobCategoryId; reason: string; detail?: string }>;
   companies: AggregatedJobRow[];
   totalPostings: number;
+  /** Personaldienstleister, die aus categories[].topCompanies und
+   *  companies[] rausgefiltert wurden. Admin-Telemetry. */
+  excludedPersonaldienstleister: Array<{ name: string; postings: number }>;
 }
 
 export async function GET(req: NextRequest): Promise<Response> {
   const url = new URL(req.url);
   const force = url.searchParams.get('force') === '1';
   const single = url.searchParams.get('category') as JobCategoryId | null;
+  // ?includePdl=1 lets Personaldienstleister back through. Default is
+  // filtered so the dashboard never has to think about it.
+  const includePdl = url.searchParams.get('includePdl') === '1';
 
   // Single-category mode — useful for the JOBS-tab category-drill-in.
   if (single) {
@@ -56,11 +63,20 @@ export async function GET(req: NextRequest): Promise<Response> {
         { status: result.reason === 'timeout' ? 504 : 502 },
       );
     }
+    // Filter the per-category topCompanies before responding (unless
+    // ?includePdl=1).
+    const catData = result.data;
+    const { keep, dropped } = filterB2BEmployers(catData.topCompanies);
+    const filteredCat = {
+      ...catData,
+      topCompanies: includePdl ? catData.topCompanies : keep,
+    };
     return Response.json(
       {
         ok: true,
         fetchedAt: result.fetchedAt,
-        category: result.data,
+        category: filteredCat,
+        excludedPersonaldienstleister: dropped.slice(0, 25),
       },
       {
         headers: {
@@ -81,16 +97,42 @@ export async function GET(req: NextRequest): Promise<Response> {
   const detailed = detailedAggregates
     .filter((r): r is Extract<typeof r, { ok: true }> => r.ok)
     .map((r) => r.data);
-  const companies = discoverCompaniesFromSnapshot(detailed, 3).slice(0, 80);
 
-  const totalPostings = categories.reduce((acc, c) => acc + c.postings, 0);
+  // 1) Filter Personaldienstleister out of EACH category's top-companies
+  //    BEFORE the 80-company cut on the rolled-up companies[] tail. This
+  //    ensures the tail is 80 B2B end-customers, not "we wanted 80 but
+  //    got 30 because half were Randstad/Hays".
+  const droppedMap = new Map<string, number>();
+  const filteredCategories: CategorySnapshot[] = categories.map((c) => {
+    if (includePdl) return c;
+    const { keep, dropped } = filterB2BEmployers(c.topCompanies);
+    for (const d of dropped) {
+      droppedMap.set(d.name, (droppedMap.get(d.name) ?? 0) + d.postings);
+    }
+    return { ...c, topCompanies: keep };
+  });
+
+  // 2) Roll up companies[] from the row-level data, then filter.
+  const rawCompanies = discoverCompaniesFromSnapshot(detailed, 3);
+  const companiesFiltered = includePdl
+    ? rawCompanies
+    : rawCompanies.filter((c) => !isPersonaldienstleister(c.name));
+  const companies = companiesFiltered.slice(0, 80);
+
+  const excludedPersonaldienstleister = Array.from(droppedMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 25)
+    .map(([name, postings]) => ({ name, postings }));
+
+  const totalPostings = filteredCategories.reduce((acc, c) => acc + c.postings, 0);
 
   const payload: BaPulseResponse = {
     ok: true,
     fetchedAt,
-    categories,
+    categories: filteredCategories,
     errors,
     companies,
+    excludedPersonaldienstleister,
     totalPostings,
   };
 
