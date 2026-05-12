@@ -64,6 +64,18 @@ export function DashboardTabs({ active, onChange, counts }: DashboardTabsProps) 
                 {tab.glyph}
               </span>
               <span className="text-[11.5px]">{tab.label}</span>
+              {tab.id === "strategy-lab" && (
+                <span
+                  className={[
+                    "rounded-sm px-1 text-[9px] font-semibold uppercase tracking-wider",
+                    isActive
+                      ? "bg-accent-cyan/15 text-accent-cyan"
+                      : "bg-bg-elevated text-accent-cyan/80",
+                  ].join(" ")}
+                >
+                  Pro
+                </span>
+              )}
               {typeof count === "number" && count > 0 && (
                 <span
                   className={[

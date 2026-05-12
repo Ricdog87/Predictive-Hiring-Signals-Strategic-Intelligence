@@ -50,6 +50,7 @@ export const TAB_IDS = [
   "jobs",
   "forecast",
   "briefing",
+  "strategy-lab",
 ] as const;
 export type TabId = (typeof TAB_IDS)[number];
 
@@ -70,4 +71,5 @@ export const PRIMARY_NAV: NavSection[] = [
   { id: "jobs",      label: "Jobs",      glyph: "⊞", chord: "g j",  hint: "DE Job-Market Pulse" },
   { id: "forecast",  label: "Forecast",  glyph: "ℙ", chord: "g f",  hint: "Predicted roles + Signal Timeline" },
   { id: "briefing",  label: "Briefing",  glyph: "✦", chord: "g b",  hint: "Morning Brief · Layoffs · Hiring · Deals" },
+  { id: "strategy-lab", label: "Strategy Lab", glyph: "⌬", chord: "g l", hint: "Multi-Agent Hiring-Brief · Pro" },
 ];
