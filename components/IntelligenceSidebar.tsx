@@ -184,6 +184,22 @@ export function IntelligenceSidebar({
             })}
           </ul>
 
+          <div className="mt-3 px-2">
+            <a
+              href="/strategy-lab"
+              className="group flex w-full items-center justify-between rounded-sm border border-accent-cyan/30 bg-accent-cyan/5 px-2 py-1.5 text-left text-[12px] text-accent-cyan transition-colors hover:bg-accent-cyan/15"
+              title="Multi-Agent Strategie-Lab · konsolidierter Vorstands-Brief für DACH-Recruiter"
+            >
+              <span className="flex items-center gap-2">
+                <span aria-hidden className="font-mono text-[12px]">⌬</span>
+                <span>Strategy Lab</span>
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-accent-cyan/70">
+                Pro
+              </span>
+            </a>
+          </div>
+
           {onOpenPalette && (
             <div className="mt-3 px-2">
               <button
