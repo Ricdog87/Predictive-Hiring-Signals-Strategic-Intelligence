@@ -35,6 +35,7 @@ import {
   fetchCategorySnapshot,
 } from '@/lib/bundesagenturAdapter';
 import type { JobCategoryId } from '@/lib/jobMarketTypes';
+import { filterB2BEmployers } from '@/lib/employerFilters';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,6 +65,15 @@ export interface JobmarketPulseResponse {
   totalPostings: number;
   byCategory: MergedCategoryRow[];
   topCompaniesAcross: Array<{ name: string; postings: number }>;
+  /**
+   * Admin-only telemetry. Personaldienstleister / Recruiter /
+   * Executive-Search-Anbieter, die der Filter aus
+   * `topCompaniesAcross` rausgeworfen hat. Max 25 Einträge, gleiches
+   * Schema wie `topCompaniesAcross` für UI-Kompatibilität. UI rendert
+   * dieses Feld nicht — es ist Diagnostik für späteres
+   * Outplacement-/Toggle-Feature.
+   */
+  excludedPersonaldienstleister: Array<{ name: string; postings: number }>;
   okCount: number;
   totalCategories: number;
   sources: {
@@ -85,21 +95,38 @@ interface CacheEntry {
   expiresAt: number;
 }
 const globalForCache = globalThis as unknown as {
-  __rsgJobmarketCache?: CacheEntry;
+  __rsgJobmarketCache?: Map<string, CacheEntry>;
 };
 
-function readCache(force: boolean): JobmarketPulseResponse | null {
+function cache(): Map<string, CacheEntry> {
+  if (!globalForCache.__rsgJobmarketCache) {
+    globalForCache.__rsgJobmarketCache = new Map();
+  }
+  return globalForCache.__rsgJobmarketCache;
+}
+
+function cacheKey(opts: { includePdl: boolean }): string {
+  return opts.includePdl ? 'with-pdl' : 'filtered';
+}
+
+function readCache(
+  force: boolean,
+  opts: { includePdl: boolean },
+): JobmarketPulseResponse | null {
   if (force) return null;
-  const hit = globalForCache.__rsgJobmarketCache;
+  const hit = cache().get(cacheKey(opts));
   if (hit && hit.expiresAt > Date.now()) return hit.data;
   return null;
 }
 
-function writeCache(data: JobmarketPulseResponse): void {
-  globalForCache.__rsgJobmarketCache = {
+function writeCache(
+  data: JobmarketPulseResponse,
+  opts: { includePdl: boolean },
+): void {
+  cache().set(cacheKey(opts), {
     data,
     expiresAt: Date.now() + CACHE_MS,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -109,8 +136,12 @@ function writeCache(data: JobmarketPulseResponse): void {
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const force = url.searchParams.get('force') === '1';
+  // Default filtering is ON. ?includePdl=1 lets the Personaldienstleister
+  // back through — used by the future Outplacement-Plays drill-in and
+  // by debug calls.
+  const includePdl = url.searchParams.get('includePdl') === '1';
 
-  const cached = readCache(force);
+  const cached = readCache(force, { includePdl });
   if (cached) {
     return Response.json(cached, {
       headers: {
@@ -213,16 +244,19 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
   // If BA delivered nothing for any row, fall back to Adzuna's roll-up.
-  let topCompaniesAcross =
+  const rolledUp =
     acrossTotals.size > 0
       ? Array.from(acrossTotals.entries())
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 15)
           .map(([name, postings]) => ({ name, postings }))
-      : (adzuna?.topCompaniesAcross ?? []).slice(0, 15);
+      : (adzuna?.topCompaniesAcross ?? []);
 
-  // Limit the rollup to 15 employers — anything beyond noise.
-  topCompaniesAcross = topCompaniesAcross.slice(0, 15);
+  // CRITICAL: filter Personaldienstleister BEFORE the top-N cut, so the
+  // final list of 15 is always 15 B2B end-customers — never "we wanted
+  // 15 but cut to 6 because half were Randstad/Hays/DIS".
+  const { keep, dropped } = filterB2BEmployers(rolledUp);
+  const topCompaniesAcross = (includePdl ? rolledUp : keep).slice(0, 15);
+  const excludedPersonaldienstleister = dropped.slice(0, 25);
 
   const okCount = rows.filter((r) => !r.unavailable).length;
   const totalPostings = rows.reduce((acc, r) => acc + r.postings, 0);
@@ -247,6 +281,7 @@ export async function GET(req: Request): Promise<Response> {
     totalPostings,
     byCategory: rows,
     topCompaniesAcross,
+    excludedPersonaldienstleister,
     okCount,
     totalCategories: ADZUNA_CATEGORIES.length,
     sources: { ba: baStatus, adzuna: adzunaStatus },
@@ -254,7 +289,7 @@ export async function GET(req: Request): Promise<Response> {
     generatedAt: new Date().toISOString(),
   };
 
-  writeCache(response);
+  writeCache(response, { includePdl });
 
   return Response.json(response, {
     headers: {
