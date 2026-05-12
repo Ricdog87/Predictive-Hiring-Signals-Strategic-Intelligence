@@ -128,11 +128,12 @@ Output: NUR ein einzelnes JSON-Objekt, keine Prosa, keine Markdown-Codeblöcke. 
 
 Regeln:
 - Mindestens 3 unterschiedliche Quellen pro Suche.
-- Priorisiere Bundesanzeiger / insolvenzbekanntmachungen.de und Tier-1 Wires (Handelsblatt, manager-magazin, Tagesschau, FAZ, Reuters DE).
+- Priorisiere Bundesanzeiger / insolvenzbekanntmachungen.de, IHK-News, regionale Tageszeitungen und Tier-1 Wires (Handelsblatt, manager-magazin, Tagesschau, FAZ, Reuters DE).
 - Erfinde NICHTS. Wenn nichts gefunden: { "events": [] }.
 - Nur DACH-Region.
 - "insolvency" für Insolvenzanträge / Insolvenzverfahren.
 - "restructuring" für Stellenabbau / Restrukturierungs-Ankündigungen mit Zahlen.
+- **Mittelstand-Bias**: Bevorzuge mittelständische Unternehmen (200-5.000 MA) — diese sind für Outplacement-Plays wertvoller als DAX-Konzerne. DAX-Standortabbau nur dann, wenn der lokale Outplacement-Pool klar quantifiziert ist (Werk-Schliessung mit Beschäftigtenzahl).
 - Maximal ${cfg.maxEvents} Events.`,
 };
 
@@ -210,15 +211,20 @@ Output: NUR ein einzelnes JSON-Objekt, keine Prosa. Schema:
   ]
 }
 
-Quellen-Priorität:
-- Tier 1: Handelsblatt, manager-magazin, FAZ, Tagesschau, Süddeutsche, Reuters DE, Bloomberg DE
-- Tier 2: WirtschaftsWoche, deutsche-startups.de, Börse-Online, finanzen.net, t3n
-- Tier 3: Pressemitteilungen direkt von Unternehmen (newsroom)
+Quellen-Priorität (DACH-Mittelstand-Bias):
+- Tier 1 (Mittelstand-relevant): Pressebox, OpenPR, IHK-Newsroom-Feeds, regionale Tageszeitungen (z. B. Stuttgarter Zeitung, Westfalenpost, Augsburger Allgemeine, Heilbronner Stimme), VDI Nachrichten, Markt & Mittelstand, Wirtschaftswoche.de Mittelstand, deutsche-startups.de
+- Tier 2 (überregional): Handelsblatt, manager-magazin, FAZ Wirtschaft, Süddeutsche Wirtschaft, Tagesschau-Wirtschaft, Reuters DE, Bloomberg DE
+- Tier 3 (Branchen-Trade-Press): t3n, Automobilwoche, Logistik-Heute, Lebensmittel-Zeitung, Pharmazeutische Zeitung, Bauwelt, Energie & Management
+- Tier 4 (direkte Quellen): Unternehmens-Newsrooms, Geschäftsberichte, Karriere-Seiten
 
 Regeln:
 - Mindestens 4 unterschiedliche Quellen verteilt über die Suchen.
 - Erfinde NICHTS. Bei Unsicherheit: weglassen.
-- Bevorzuge Mid-Cap & Mittelstand (50–10.000 MA), nicht nur DAX.
+- **HARTE Mittelstand-Pflicht**: Bevorzuge mittelständische Unternehmen (200-5.000 MA) — Hidden Champions, Familienunternehmen, regionale Marktführer. Kein DAX, kein MDAX, kein TecDAX als Hauptthema außer:
+  (a) eine Mittelstands-Tochter ist betroffen (dann die Tochter nennen, nicht den Konzern) ODER
+  (b) der Konzern ist Käufer/Verkäufer einer Mittelstands-Firma (dann das Target nennen) ODER
+  (c) DAX-Standortabbau mit klarem Outplacement-Pool für Mittelstands-Recruiter.
+- **Geografische Verteilung**: Bevorzuge B-Städte und Regionen (Baden-Württemberg ausserhalb Stuttgart, Bayern ausserhalb München, NRW Westfalen-Sauerland, Mittel-/Norddeutschland) gegenüber den Top-3-Metropolen.
 - "affected" ist eine Zahl: bei Hiring = Anzahl Stellen, bei Funding = Mio €/$, bei M&A = Deal-Volumen Mio €.
 - Maximal ${cfg.maxEvents} Events. Diversifiziere über Branchen.
 - Mindestens 5 verschiedene Bundesländer wenn möglich.`,
