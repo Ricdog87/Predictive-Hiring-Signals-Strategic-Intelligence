@@ -7,9 +7,20 @@
 export interface DataSourceStatus {
   id: string;
   label: string;
-  status: "live" | "idle" | "mock" | "down";
+  /**
+   * `live`     — data flowing right now
+   * `pending`  — adapter exists but integration is not yet wired (e.g. waiting
+   *              on an upstream API key) — deliberately not the same as `idle`,
+   *              which we reserve for sources that are intentionally paused.
+   * `idle`     — source paused for a non-failure reason
+   * `mock`     — synthetic data only, no upstream attached
+   * `down`     — upstream returned an error
+   */
+  status: "live" | "pending" | "idle" | "mock" | "down";
   lastSync: string;
   throughput: string;
+  /** Free-text hint shown when the user hovers/clicks the source row. */
+  note?: string;
 }
 
 export const DATA_SOURCES: DataSourceStatus[] = [
@@ -19,7 +30,14 @@ export const DATA_SOURCES: DataSourceStatus[] = [
   { id: "company_newsroom", label: "Company Newsroom", status: "live", lastSync: "5m ago", throughput: "18/h" },
   { id: "linkedin_company", label: "LinkedIn (company)", status: "live", lastSync: "12s ago", throughput: "184/h" },
   { id: "job_posting_trend", label: "Job posting trend", status: "live", lastSync: "26s ago", throughput: "92/h" },
-  { id: "patent_signals", label: "Patent signals", status: "idle", lastSync: "18m ago", throughput: "4/h" },
+  {
+    id: "patent_signals",
+    label: "Patent signals",
+    status: "pending",
+    lastSync: "—",
+    throughput: "0/h",
+    note: "Keyword-Klassifizierung aktiv, aktive Registry-Anbindung (DPMA / EPO OPS) ausstehend — siehe docs/DISCOVERY_AUDIT_2026_05.md",
+  },
   { id: "funding_signals", label: "Funding signals", status: "live", lastSync: "9m ago", throughput: "6/h" },
 ];
 
