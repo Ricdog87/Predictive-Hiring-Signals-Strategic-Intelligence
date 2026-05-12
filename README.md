@@ -1,3 +1,5 @@
+
+<!-- trigger redeploy 2026-05-12 -->
 # RSG Predictive Hiring Radar
 
 Production Market Intelligence Terminal that surfaces **predictive hiring
