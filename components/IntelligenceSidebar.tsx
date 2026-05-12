@@ -150,7 +150,7 @@ export function IntelligenceSidebar({
         <nav className="flex-1 overflow-y-auto px-2 py-3">
           <SectionHeader label="Workspace" />
           <ul className="space-y-0.5">
-            {PRIMARY_NAV.map((n) => {
+            {PRIMARY_NAV.filter((n) => n.id !== "strategy-lab").map((n) => {
               const isActive = activeTab === n.id;
               return (
                 <li key={n.id}>
@@ -185,19 +185,30 @@ export function IntelligenceSidebar({
           </ul>
 
           <div className="mt-3 px-2">
-            <a
-              href="/strategy-lab"
-              className="group flex w-full items-center justify-between rounded-sm border border-accent-cyan/30 bg-accent-cyan/5 px-2 py-1.5 text-left text-[12px] text-accent-cyan transition-colors hover:bg-accent-cyan/15"
-              title="Multi-Agent Strategie-Lab · konsolidierter Vorstands-Brief für DACH-Recruiter"
+            <button
+              type="button"
+              onClick={() => handleSwitchTab("strategy-lab")}
+              aria-current={activeTab === "strategy-lab" ? "true" : undefined}
+              className={`group flex w-full items-center justify-between rounded-sm border px-2 py-1.5 text-left text-[12px] transition-colors ${
+                activeTab === "strategy-lab"
+                  ? "border-accent-cyan/50 bg-accent-cyan/15 text-accent-cyan"
+                  : "border-accent-cyan/30 bg-accent-cyan/5 text-accent-cyan hover:bg-accent-cyan/15"
+              }`}
+              title="Multi-Agent Strategie-Lab · konsolidierter Vorstands-Brief für DACH-Recruiter · g l"
             >
               <span className="flex items-center gap-2">
                 <span aria-hidden className="font-mono text-[12px]">⌬</span>
                 <span>Strategy Lab</span>
               </span>
-              <span className="font-mono text-[10px] uppercase tracking-wider text-accent-cyan/70">
-                Pro
+              <span className="flex items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-accent-cyan/70">
+                  Pro
+                </span>
+                <span className="hidden font-mono text-[10px] text-text-faint lg:inline">
+                  g l
+                </span>
               </span>
-            </a>
+            </button>
           </div>
 
           {onOpenPalette && (

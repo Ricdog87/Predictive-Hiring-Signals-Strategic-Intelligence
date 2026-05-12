@@ -24,6 +24,7 @@ import { InsolvenzPulsePanel } from "@/components/InsolvenzPulsePanel";
 import { RegionIntelligencePanel } from "@/components/RegionIntelligencePanel";
 import { MarketClusterView } from "@/components/MarketClusterView";
 import { TodayPanel } from "@/components/TodayPanel";
+import { StrategyLabPanel } from "@/components/strategy-lab";
 import {
   DashboardTabs,
   readPersistedTab,
@@ -42,7 +43,7 @@ import {
 } from "@/lib/marketIntelligence";
 import { toCompanyViews, type CompanyView } from "@/lib/marketView";
 import { getSessionUser } from "@/lib/session";
-import { DATA_SOURCES, type TabId } from "@/lib/uiMockData";
+import { DATA_SOURCES, TAB_IDS, type TabId } from "@/lib/uiMockData";
 import type {
   MarketCluster,
   MarketOverview,
@@ -120,8 +121,16 @@ export default function DashboardPage() {
     []
   );
 
-  // Hydrate persisted tab choice
+  // Hydrate persisted tab choice. ?tab=<id> in the URL wins over the
+  // localStorage value (so /strategy-lab → ?tab=strategy-lab can deep-link).
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const queryTab = new URLSearchParams(window.location.search).get("tab");
+      if (queryTab && (TAB_IDS as readonly string[]).includes(queryTab)) {
+        setActiveTab(queryTab as TabId);
+        return;
+      }
+    }
     const persisted = readPersistedTab();
     if (persisted) setActiveTab(persisted);
   }, []);
@@ -172,6 +181,7 @@ export default function DashboardPage() {
   useChord("g j", () => setActiveTab("jobs"));
   useChord("g f", () => setActiveTab("forecast"));
   useChord("g b", () => setActiveTab("briefing"));
+  useChord("g l", () => setActiveTab("strategy-lab"));
 
   const sectorOptions = useMemo(
     () => data.sectors.map((s) => s.sector),
@@ -460,6 +470,20 @@ export default function DashboardPage() {
                 </ErrorBoundary>
                 <ErrorBoundary section="Wire Feed">
                   <BreakingNewsStrip />
+                </ErrorBoundary>
+              </div>
+            )}
+
+            {/* STRATEGY LAB TAB */}
+            {activeTab === "strategy-lab" && (
+              <div role="tabpanel" id="panel-strategy-lab" className="space-y-5">
+                <SectionTitle
+                  eyebrow="Strategy Lab · Pro"
+                  title="Multi-Agent Hiring Brief · DACH"
+                  hint="virtuelles Vorstandsgremium · konsolidierter Output"
+                />
+                <ErrorBoundary section="Strategy Lab">
+                  <StrategyLabPanel />
                 </ErrorBoundary>
               </div>
             )}
