@@ -12,7 +12,7 @@ import { MacroStrip } from "@/components/MacroStrip";
 import { JobMarketPanel } from "@/components/JobMarketPanel";
 import { MorningBriefCard } from "@/components/MorningBriefCard";
 import { ResearchModal } from "@/components/ResearchModal";
-import { VoiceGreeter } from "@/components/VoiceGreeter";
+import { JarvisGreeter } from "@/components/voice/JarvisGreeter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useChord } from "@/lib/hotkeys";
 import { FilterBar, type FilterState } from "@/components/FilterBar";
@@ -542,7 +542,7 @@ export default function DashboardPage() {
 
       <ResearchModal query={researchQuery} onClose={() => setResearchQuery(null)} />
 
-      <VoiceGreeter />
+      <JarvisGreeter />
     </div>
   );
 }
